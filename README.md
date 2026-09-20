@@ -110,6 +110,7 @@ python backend/manage.py stress_test_simulation
 - 🔌 [REST API Documentation](file:///r:/Projects/bid2code/docs/API.md)
 - 🐳 [Docker Infrastructure Guide](file:///r:/Projects/bid2code/docs/DOCKER_GUIDE.md)
 - 📋 [Event Day Organizer Runbook](file:///r:/Projects/bid2code/docs/EVENT_DAY_GUIDE.md)
+- ☁️ [Netlify & Firebase 24/7 Deployment Guide](file:///r:/Projects/bid2code/docs/NETLIFY_FIREBASE_GUIDE.md)
 
 ---
 
