@@ -55,15 +55,17 @@ Organizer Laptop / Backend (sync_firebase_participants)
    - **Publish directory**: `dist`
 5. Click **"Environment variables"** (or add under *Site configuration → Environment variables*):
    ```text
-   VITE_FIREBASE_API_KEY = your_api_key_here
-   VITE_FIREBASE_AUTH_DOMAIN = bit2code-2026.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID = bit2code-2026
-   VITE_FIREBASE_STORAGE_BUCKET = bit2code-2026.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID = your_sender_id
-   VITE_FIREBASE_APP_ID = your_app_id
+   VITE_FIREBASE_API_KEY         = <your apiKey from Firebase Console>
+   VITE_FIREBASE_AUTH_DOMAIN     = <your authDomain>
+   VITE_FIREBASE_PROJECT_ID      = <your projectId>
+   VITE_FIREBASE_STORAGE_BUCKET  = <your storageBucket>
+   VITE_FIREBASE_MESSAGING_SENDER_ID = <your messagingSenderId>
+   VITE_FIREBASE_APP_ID          = <your appId>
+   VITE_FIREBASE_MEASUREMENT_ID  = <your measurementId>
    ```
+   > ⚠️ **Never paste real keys in the repo!** Always set them only in the Netlify dashboard.
 6. Click **"Deploy site"**.
-7. In ~30 seconds, Netlify will give you a live URL (e.g., `https://bit2code-2026.netlify.app`)!
+7. In ~30 seconds, Netlify will give you a live URL!
 
 ---
 
@@ -72,7 +74,7 @@ Organizer Laptop / Backend (sync_firebase_participants)
 Whenever you start your Django backend on event day (29 September 2026), run the sync command to import all participants registered via Firebase:
 
 ```powershell
-python backend/manage.py sync_firebase_participants --project-id bit2code-2026
+python backend/manage.py sync_firebase_participants --project-id bid2code
 ```
 
 All participants will be imported into PostgreSQL with their exact starting balance of **1,000 points** and assigned their anonymous IDs (`P01`, `P02`, etc.) ready for the live auction!
