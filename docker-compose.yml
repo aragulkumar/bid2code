@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bit2code-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bit2code_db}
+      POSTGRES_USER: ${POSTGRES_USER:-bit2code_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bit2code_password_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bit2code_user} -d ${POSTGRES_DB:-bit2code_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bit2code-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bit2code-backend
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_demo_data &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-bit2code-event-key}
+      DEBUG: ${DEBUG:-True}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      POSTGRES_DB: ${POSTGRES_DB:-bit2code_db}
+      POSTGRES_USER: ${POSTGRES_USER:-bit2code_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bit2code_password_2026}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: postgres://${POSTGRES_USER:-bit2code_user}:${POSTGRES_PASSWORD:-bit2code_password_2026}@postgres:5432/${POSTGRES_DB:-bit2code_db}
+      JUDGE0_URL: ${JUDGE0_URL:-http://judge0-server:2358}
+      JUDGE0_USE_MOCK_FALLBACK: ${JUDGE0_USE_MOCK_FALLBACK:-True}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bit2code-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+      - "80:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # Optional Judge0 CE Services for Sandboxed Code Execution
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    container_name: bit2code-judge0-server
+    restart: unless-stopped
+    ports:
+      - "2358:2358"
+    environment:
+      - REDIS_HOST=judge0-redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0_password
+    depends_on:
+      - judge0-db
+      - judge0-redis
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    container_name: bit2code-judge0-worker
+    restart: unless-stopped
+    command: ["./scripts/workers"]
+    privileged: true
+    environment:
+      - REDIS_HOST=judge0-redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0_password
+    depends_on:
+      - judge0-db
+      - judge0-redis
+
+  judge0-db:
+    image: postgres:13-alpine
+    container_name: bit2code-judge0-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0_password
+    volumes:
+      - judge0_db_data:/var/lib/postgresql/data
+
+  judge0-redis:
+    image: redis:6-alpine
+    container_name: bit2code-judge0-redis
+    restart: unless-stopped
+    volumes:
+      - judge0_redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  judge0_db_data:
+  judge0_redis_data:
