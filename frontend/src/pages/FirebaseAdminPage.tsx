@@ -114,7 +114,7 @@ const LoginGate: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
               <ShieldAlert className="w-7 h-7 text-rose-400" />
             </div>
             <h1 className="text-2xl font-black text-white">Admin Access</h1>
-            <p className="text-sm text-gray-400 mt-1">BIT2CODE Organizer Portal</p>
+            <p className="text-sm text-gray-400 mt-1">BID2CODE Organizer Portal</p>
           </div>
 
           {error && (

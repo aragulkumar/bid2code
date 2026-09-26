@@ -10,7 +10,8 @@ import {
   Cpu, 
   Flame, 
   ArrowRight,
-  UserCheck
+  UserCheck,
+  Calendar
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -25,14 +26,25 @@ export const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 lg:pt-28 lg:pb-24">
         <div className="text-center max-w-3xl mx-auto">
-          {/* Badge */}
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-6 animate-pulse">
+          {/* Badge & Timing */}
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-4 animate-pulse">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>IEEE Computer Society • 29 September 2026</span>
+            <span>IEEE Computer Society Event</span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-6 text-sm font-medium">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/60 border border-indigo-500/30 text-indigo-300">
+              <Calendar className="w-4 h-4 text-indigo-400" />
+              29th September 2026
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300">
+              <Clock className="w-4 h-4 text-purple-400" />
+              6:15 PM – 8:00 PM
+            </span>
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-tight">
-            BIT<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">2CODE</span>
+            BID<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">2CODE</span>
           </h1>
 
           <p className="mt-4 text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-white to-purple-200">
@@ -40,7 +52,7 @@ export const LandingPage: React.FC = () => {
           </p>
 
           <p className="mt-6 text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto">
-            BIT2CODE is an online coding challenge where participants compete in a live algorithm auction, secure an algorithm through strategic bidding, and solve tailored coding problems with a personal 40-minute countdown.
+            BID2CODE is an online coding challenge where participants compete in a live algorithm auction, secure an algorithm through strategic bidding, and solve tailored coding problems with a personal 40-minute countdown.
           </p>
 
           {/* CTA Buttons */}

@@ -7,14 +7,14 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
           <Code2 className="w-5 h-5 text-indigo-400" />
-          <span className="font-bold text-white tracking-wide">BIT2CODE</span>
+          <span className="font-bold text-white tracking-wide">BID2CODE</span>
           <span className="text-gray-500">|</span>
           <span className="text-gray-400">IEEE Computer Society Student Branch</span>
         </div>
 
         <div className="text-center md:text-right">
           <p className="text-xs text-gray-500">
-            Event Date: <span className="text-indigo-300 font-semibold">29 September 2026</span> • Sandboxed Execution via Judge0 CE
+            Event Date: <span className="text-indigo-300 font-semibold">29 September 2026 (6:15 PM – 8:00 PM)</span> • Sandboxed Execution via Judge0 CE
           </p>
           <p className="text-xs text-gray-500 mt-1">
             Bid Smart. Code Smarter.

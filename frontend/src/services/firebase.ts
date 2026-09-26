@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDocs, collection, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
 // Firebase credentials are injected at build time via Netlify Environment Variables.
 // NEVER hardcode keys here — set them in Netlify Dashboard → Site settings → Environment variables.
@@ -17,6 +17,9 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
+// ── Event capacity limit ────────────────────────────────────────────────────
+export const MAX_PARTICIPANTS = 40;
+
 export interface FirebaseRegistrationData {
   full_name: string;
   email: string;
@@ -32,23 +35,47 @@ export interface FirebaseRegistrationData {
 }
 
 /**
+ * Returns the current count of registered participants.
+ * Used to show live slot availability on the Register page.
+ */
+export async function getParticipantCount(): Promise<number> {
+  const snap = await getDocs(collection(db, 'participants'));
+  return snap.size;
+}
+
+/**
  * Saves participant registration directly to Firestore `participants` collection.
- * No Firebase Auth required — Firestore is used purely as a cloud database.
- * The `participants` collection is created automatically on first registration.
+ *
+ * Rules enforced:
+ *  1. Hard cap at MAX_PARTICIPANTS (40). Throws if full.
+ *  2. Duplicate email check — throws if already registered.
+ *  3. Labels assigned sequentially (P01 … P40).
  */
 export async function registerParticipantWithFirebase(data: FirebaseRegistrationData) {
-  // Use email (sanitized) as document ID so duplicate registrations merge cleanly
   const docId = data.email.replace(/[.@]/g, '_');
 
-  // Count existing participants for sequential anonymous label (P01, P02, ...)
-  let label = `P${Math.floor(Math.random() * 90 + 10)}`; // fallback
-  try {
-    const snap = await getDocs(collection(db, 'participants'));
-    const count = snap.size + 1;
-    label = `P${count.toString().padStart(2, '0')}`;
-  } catch {
-    // Firestore read failed (e.g. rules) — use random fallback label, write still proceeds
+  // 1. Fetch current snapshot once (used for both cap + label)
+  const snap = await getDocs(collection(db, 'participants'));
+  const currentCount = snap.size;
+
+  // 2. Hard capacity check — block if event is full
+  if (currentCount >= MAX_PARTICIPANTS) {
+    throw new Error(
+      `Registration is closed. BID2CODE 2026 has reached its maximum capacity of ${MAX_PARTICIPANTS} participants.`
+    );
   }
+
+  // 3. Duplicate email check — block if already registered
+  const existing = await getDoc(doc(db, 'participants', docId));
+  if (existing.exists()) {
+    throw new Error(
+      `This email is already registered. If you need help, contact the event organizers.`
+    );
+  }
+
+  // 4. Assign sequential label (P01 … P40)
+  const nextNumber = currentCount + 1;
+  const label = `P${nextNumber.toString().padStart(2, '0')}`;
 
   const participantDoc = {
     uid: docId,
@@ -70,8 +97,7 @@ export async function registerParticipantWithFirebase(data: FirebaseRegistration
     server_timestamp: serverTimestamp(),
   };
 
-  const docRef = doc(db, 'participants', docId);
-  await setDoc(docRef, participantDoc, { merge: true });
+  await setDoc(doc(db, 'participants', docId), participantDoc);
 
   return participantDoc;
 }

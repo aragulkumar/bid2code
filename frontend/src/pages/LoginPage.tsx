@@ -35,7 +35,7 @@ export const LoginPage: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mx-auto mb-4">
             <Code2 className="w-7 h-7" />
           </div>
-          <h1 className="text-3xl font-black text-white">Sign In to BIT2CODE</h1>
+          <h1 className="text-3xl font-black text-white">Sign In to BID2CODE</h1>
           <p className="text-sm text-gray-400 mt-2">
             Access the live auction, code arena, and your personal leaderboard.
           </p>

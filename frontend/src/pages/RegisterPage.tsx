@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { registerParticipantWithFirebase } from '../services/firebase';
-import { UserPlus, Sparkles, CheckCircle2, AlertCircle, Coins, Cloud } from 'lucide-react';
+import { registerParticipantWithFirebase, getParticipantCount, MAX_PARTICIPANTS } from '../services/firebase';
+import { UserPlus, Sparkles, CheckCircle2, AlertCircle, Coins, Cloud, Users, Lock } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -26,6 +26,17 @@ export const RegisterPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [participantCount, setParticipantCount] = useState<number | null>(null);
+
+  // Fetch current participant count on mount
+  useEffect(() => {
+    getParticipantCount()
+      .then(count => setParticipantCount(count))
+      .catch(() => setParticipantCount(null));
+  }, []);
+
+  const isFull = participantCount !== null && participantCount >= MAX_PARTICIPANTS;
+  const slotsLeft = participantCount !== null ? Math.max(0, MAX_PARTICIPANTS - participantCount) : null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -48,7 +59,7 @@ export const RegisterPage: React.FC = () => {
     }
 
     if (!formData.agree_terms) {
-      setError("You must agree to the BIT2CODE event rules.");
+      setError("You must agree to the BID2CODE event rules.");
       return;
     }
 
@@ -95,14 +106,49 @@ export const RegisterPage: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5" />
             <span>24/7 Participant Onboarding</span>
           </div>
-          <h1 className="text-3xl font-black text-white">Join BIT2CODE 2026</h1>
+          <h1 className="text-3xl font-black text-white">Join BID2CODE 2026</h1>
           <p className="text-sm text-gray-400 mt-2">
             Every registered participant receives <span className="text-amber-400 font-semibold inline-flex items-center gap-1"><Coins className="w-3.5 h-3.5 inline" /> 1000 virtual auction points</span>.
           </p>
+
+          {/* Live slot counter */}
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold"
+            style={{
+              backgroundColor: isFull ? 'rgba(239,68,68,0.1)' : slotsLeft !== null && slotsLeft <= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+              borderColor: isFull ? 'rgba(239,68,68,0.3)' : slotsLeft !== null && slotsLeft <= 5 ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)',
+              color: isFull ? '#f87171' : slotsLeft !== null && slotsLeft <= 5 ? '#fbbf24' : '#34d399',
+            }}
+          >
+            <Users className="w-4 h-4" />
+            {participantCount === null
+              ? 'Checking availability…'
+              : isFull
+              ? '🔒 Registration Closed — Event Full (40/40)'
+              : slotsLeft === 1
+              ? '⚡ Only 1 slot remaining!'
+              : slotsLeft !== null && slotsLeft <= 5
+              ? `⚡ Only ${slotsLeft} slots left!`
+              : `${slotsLeft} of ${MAX_PARTICIPANTS} slots available`
+            }
+          </div>
         </div>
 
         {/* Card */}
         <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-gray-800">
+          {/* Registration Closed Banner */}
+          {isFull && (
+            <div className="mb-6 p-5 rounded-xl bg-rose-500/10 border border-rose-500/40 text-center">
+              <Lock className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+              <div className="text-rose-300 font-black text-lg">Registration is Closed</div>
+              <div className="text-rose-400/80 text-sm mt-1">
+                BID2CODE 2026 has reached its maximum capacity of <strong>40 participants</strong>.
+              </div>
+              <div className="text-gray-500 text-xs mt-2">
+                Contact the IEEE CS organizers if you believe this is an error.
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
@@ -319,7 +365,7 @@ export const RegisterPage: React.FC = () => {
                   className="mt-1 w-4 h-4 rounded text-indigo-600 bg-gray-900 border-gray-700 focus:ring-indigo-500"
                 />
                 <span className="text-xs text-gray-400 leading-normal">
-                  I agree to participate in BIT2CODE and follow the IEEE CS event rules, strategic auction guidelines, and coding ethics.
+                  I agree to participate in BID2CODE and follow the IEEE CS event rules, strategic auction guidelines, and coding ethics.
                 </span>
               </label>
             </div>
@@ -328,11 +374,20 @@ export const RegisterPage: React.FC = () => {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 disabled:opacity-50 transition-all flex items-center justify-center space-x-2"
+                disabled={isSubmitting || isFull}
+                className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg disabled:opacity-50 transition-all flex items-center justify-center space-x-2 ${
+                  isFull
+                    ? 'bg-gray-700 cursor-not-allowed shadow-none'
+                    : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
+                }`}
               >
                 {isSubmitting ? (
                   <span>Registering to Cloud...</span>
+                ) : isFull ? (
+                  <>
+                    <Lock className="w-5 h-5 text-gray-400" />
+                    <span>Registration Closed (Event Full)</span>
+                  </>
                 ) : (
                   <>
                     <Cloud className="w-5 h-5 text-indigo-200" />

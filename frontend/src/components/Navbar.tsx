@@ -38,7 +38,7 @@ export const Navbar: React.FC = () => {
               </div>
               <div>
                 <span className="text-xl font-black tracking-tight text-white flex items-center gap-1">
-                  BIT<span className="text-indigo-400">2</span>CODE
+                  BID<span className="text-indigo-400">2</span>CODE
                 </span>
                 <span className="block text-[10px] text-gray-400 font-mono tracking-wider uppercase">IEEE CS Event</span>
               </div>
