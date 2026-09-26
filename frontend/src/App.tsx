@@ -11,6 +11,7 @@ import { AuctionPage } from './pages/AuctionPage';
 import { ArenaPage } from './pages/ArenaPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { AdminPortalPage } from './pages/AdminPortalPage';
+import { FirebaseAdminPage } from './pages/FirebaseAdminPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -97,6 +98,9 @@ export const App: React.FC = () => {
                   </AdminRoute>
                 }
               />
+
+              {/* Firebase Admin — password-gated, works 24/7 on Netlify without Docker */}
+              <Route path="/firebase-admin" element={<FirebaseAdminPage />} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
