@@ -1,20 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Gavel, 
   Clock, 
-  Terminal, 
   Award, 
   Sparkles, 
   ShieldCheck, 
   Cpu, 
-  Flame, 
   ArrowRight,
   UserCheck,
-  Calendar
+  Calendar,
+  LockKeyhole,
 } from 'lucide-react';
+import { getRegistrationStatus, getParticipantCount, MAX_PARTICIPANTS } from '../services/firebase';
 
 export const LandingPage: React.FC = () => {
+  const [regOpen, setRegOpen] = useState<boolean | null>(null); // null = loading
+  const [participantCount, setParticipantCount] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchStatus() {
+      try {
+        const [open, count] = await Promise.all([
+          getRegistrationStatus(),
+          getParticipantCount(),
+        ]);
+        if (!cancelled) {
+          setRegOpen(open && count < MAX_PARTICIPANTS);
+          setParticipantCount(count);
+        }
+      } catch {
+        if (!cancelled) setRegOpen(true); // fallback: show register button
+      }
+    }
+    fetchStatus();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0B0F19] text-gray-100">
       {/* Background Decorative Gradients */}
@@ -57,13 +80,32 @@ export const LandingPage: React.FC = () => {
 
           {/* CTA Buttons */}
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              to="/register"
-              className="w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
-            >
-              <span>Register Now</span>
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+            {regOpen === null ? (
+              /* Loading skeleton */
+              <div className="w-48 h-14 rounded-xl bg-gray-800/60 animate-pulse" />
+            ) : regOpen ? (
+              /* Registration is OPEN */
+              <Link
+                to="/register"
+                className="w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
+              >
+                <span>Register Now</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            ) : (
+              /* Registration is CLOSED / Full */
+              <div className="w-full sm:w-auto flex flex-col items-center gap-3">
+                <div className="px-8 py-4 rounded-xl font-bold text-rose-300 bg-rose-500/10 border border-rose-500/30 flex items-center justify-center space-x-2 cursor-not-allowed select-none">
+                  <LockKeyhole className="w-5 h-5 text-rose-400" />
+                  <span>Registration Closed</span>
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                  {participantCount >= MAX_PARTICIPANTS
+                    ? `All ${MAX_PARTICIPANTS} spots are filled. Registration is closed.`
+                    : 'Registration has been closed by the organizers.'}
+                </p>
+              </div>
+            )}
 
             <Link
               to="/login"
