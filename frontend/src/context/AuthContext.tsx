@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Participant } from '../types';
 import { api } from '../services/api';
+import { loginParticipantWithFirebase } from '../services/firebase';
 
 interface AuthContextType {
   user: Participant | null;
@@ -19,28 +20,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshUser = async () => {
+    // 1. Try active backend token first
     const token = localStorage.getItem('bit2code_access_token');
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
+    if (token) {
+      try {
+        const data = await api.getMe();
+        if (data && data.id) {
+          setUser(data as Participant);
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        localStorage.removeItem('bit2code_access_token');
+        localStorage.removeItem('bit2code_refresh_token');
+      }
     }
 
-    try {
-      const data = await api.getMe();
-      if (data.id) {
-        setUser(data as Participant);
-      } else {
-        setUser(null);
+    // 2. Check if participant has a Firebase session (24/7 cloud availability)
+    const storedFbUser = localStorage.getItem('bit2code_firebase_user');
+    if (storedFbUser) {
+      try {
+        const parsed = JSON.parse(storedFbUser);
+        setUser(parsed as Participant);
+        setIsLoading(false);
+        return;
+      } catch {
+        localStorage.removeItem('bit2code_firebase_user');
       }
-    } catch (err) {
-      console.error('Failed to fetch user profile:', err);
-      localStorage.removeItem('bit2code_access_token');
-      localStorage.removeItem('bit2code_refresh_token');
-      setUser(null);
-    } finally {
-      setIsLoading(false);
     }
+
+    setUser(null);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -48,11 +58,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (credentials: { username: string; password: string }) => {
-    const res = await api.login(credentials);
-    if (res.access) {
-      localStorage.setItem('bit2code_access_token', res.access);
-      localStorage.setItem('bit2code_refresh_token', res.refresh);
-      await refreshUser();
+    // 1. Try Firebase Cloud first (handles all participant registrations)
+    try {
+      const fbUser = await loginParticipantWithFirebase(credentials);
+      localStorage.setItem('bit2code_firebase_user', JSON.stringify(fbUser));
+      setUser(fbUser as any);
+
+      // Best effort backend sync in background
+      api.login(credentials)
+        .then(res => {
+          if (res.access) {
+            localStorage.setItem('bit2code_access_token', res.access);
+            localStorage.setItem('bit2code_refresh_token', res.refresh);
+          }
+        })
+        .catch(() => {});
+      return;
+    } catch (fbErr: any) {
+      // If it's an explicit wrong password, fail immediately
+      if (fbErr.message?.includes('Incorrect password')) {
+        throw fbErr;
+      }
+
+      // 2. Fallback to backend API (e.g. for staff/admin user)
+      try {
+        const res = await api.login(credentials);
+        if (res.access) {
+          localStorage.setItem('bit2code_access_token', res.access);
+          localStorage.setItem('bit2code_refresh_token', res.refresh);
+          await refreshUser();
+          return;
+        }
+      } catch (backendErr: any) {
+        throw new Error(fbErr.message || backendErr.message || 'Invalid username or password.');
+      }
     }
   };
 
@@ -68,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     localStorage.removeItem('bit2code_access_token');
     localStorage.removeItem('bit2code_refresh_token');
+    localStorage.removeItem('bit2code_firebase_user');
     setUser(null);
   };
 

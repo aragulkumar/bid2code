@@ -1,5 +1,16 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  deleteDoc, 
+  collection, 
+  query, 
+  orderBy, 
+  serverTimestamp 
+} from 'firebase/firestore';
 
 // Firebase credentials are injected at build time via Netlify Environment Variables.
 // NEVER hardcode keys here — set them in Netlify Dashboard → Site settings → Environment variables.
@@ -86,6 +97,7 @@ export async function registerParticipantWithFirebase(data: FirebaseRegistration
     department: data.department,
     year_of_study: data.year_of_study,
     username: data.username,
+    password: data.password || '',
     github_profile: data.github_profile || '',
     linkedin_profile: data.linkedin_profile || '',
     anonymous_label: label,
@@ -103,10 +115,85 @@ export async function registerParticipantWithFirebase(data: FirebaseRegistration
 }
 
 /**
+ * Authenticates a participant against Firestore cloud registrations.
+ * Allows login via registered username or email.
+ */
+export async function loginParticipantWithFirebase(credentials: { username: string; password: string }) {
+  const searchKey = credentials.username.trim().toLowerCase();
+  const rawInput = credentials.username.trim();
+
+  const snap = await getDocs(collection(db, 'participants'));
+  let matchedDoc: any = null;
+
+  for (const docSnap of snap.docs) {
+    const data = docSnap.data();
+    const docEmail = (data.email || '').trim().toLowerCase();
+    const docUsername = (data.username || '').trim().toLowerCase();
+    
+    if (docUsername === searchKey || docEmail === searchKey || data.username === rawInput || data.email === rawInput) {
+      matchedDoc = { ...data, uid: docSnap.id };
+      break;
+    }
+  }
+
+  if (!matchedDoc) {
+    throw new Error('No registered participant found with that username or email. Please register first.');
+  }
+
+  // Check password if saved
+  if (matchedDoc.password && matchedDoc.password !== credentials.password) {
+    throw new Error('Incorrect password. Please verify your credentials.');
+  }
+
+  // If password was missing from legacy registration, save it now
+  if (!matchedDoc.password && credentials.password) {
+    try {
+      await setDoc(doc(db, 'participants', matchedDoc.uid), { password: credentials.password }, { merge: true });
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  const participantUser = {
+    id: matchedDoc.uid,
+    username: matchedDoc.username,
+    anonymous_label: matchedDoc.anonymous_label || 'P01',
+    name: matchedDoc.name || matchedDoc.full_name || matchedDoc.username,
+    email: matchedDoc.email,
+    phone: matchedDoc.phone || '',
+    college: matchedDoc.college || '',
+    department: matchedDoc.department || '',
+    year_of_study: matchedDoc.year_of_study || '',
+    github_profile: matchedDoc.github_profile || '',
+    linkedin_profile: matchedDoc.linkedin_profile || '',
+    balance: matchedDoc.balance ?? 1000,
+    algorithm_assigned: matchedDoc.algorithm_assigned ?? null,
+    algorithm_assigned_name: matchedDoc.algorithm_assigned_name ?? null,
+    coding_started_at: matchedDoc.coding_started_at ?? null,
+    coding_deadline: matchedDoc.coding_deadline ?? null,
+    remaining_coding_seconds: matchedDoc.remaining_coding_seconds ?? 2400,
+    has_algorithm: !!matchedDoc.algorithm_assigned,
+    is_coding: !!matchedDoc.is_coding,
+    is_coding_finished: !!matchedDoc.is_coding_finished,
+    is_staff: !!matchedDoc.is_staff,
+    created_at: matchedDoc.created_at || new Date().toISOString(),
+  };
+
+  return participantUser;
+}
+
+/**
+ * Deletes a participant document from Firestore by their document ID.
+ */
+export async function deleteFirebaseParticipant(docId: string): Promise<void> {
+  await deleteDoc(doc(db, 'participants', docId));
+}
+
+/**
  * Fetches all registered participants from Firestore (sorted by registration time)
  */
 export async function getAllFirebaseParticipants() {
   const q = query(collection(db, 'participants'), orderBy('created_at', 'asc'));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(d => d.data());
+  return querySnapshot.docs.map(d => ({ uid: d.id, ...d.data() }));
 }

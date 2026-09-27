@@ -53,14 +53,14 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                Username
+                Username or Email
               </label>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                placeholder="Enter your username or registered email"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900/80 border border-gray-700 text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
               />
             </div>
@@ -97,15 +97,8 @@ export const LoginPage: React.FC = () => {
             </div>
           </form>
 
-          {/* Quick Demo hint */}
-          <div className="mt-6 pt-4 border-t border-gray-800 text-center">
-            <p className="text-xs text-gray-500">
-              Admin account: <code className="text-indigo-400 font-mono">admin</code> / <code className="text-indigo-400 font-mono">admin123</code>
-            </p>
-          </div>
-
           {/* Footer Link */}
-          <div className="mt-4 text-center text-xs text-gray-400">
+          <div className="mt-6 pt-4 border-t border-gray-800 text-center text-xs text-gray-400">
             Don't have an account?{' '}
             <Link to="/register" className="text-indigo-400 hover:underline font-semibold">
               Register now (1000 pts)

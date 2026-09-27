@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllFirebaseParticipants } from '../services/firebase';
+import { getAllFirebaseParticipants, deleteFirebaseParticipant } from '../services/firebase';
 import {
   ShieldAlert,
   Users,
@@ -17,6 +17,7 @@ import {
   Search,
   AlertCircle,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 
 // ── Simple password gate ──────────────────────────────────────────────────────
@@ -171,6 +172,9 @@ export const FirebaseAdminPage: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [deletingUid, setDeletingUid] = useState<string | null>(null);
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<FirebaseParticipant | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const fetchParticipants = useCallback(async () => {
     setIsLoading(true);
@@ -190,6 +194,21 @@ export const FirebaseAdminPage: React.FC = () => {
   useEffect(() => {
     if (authed) fetchParticipants();
   }, [authed, fetchParticipants]);
+
+  const handleDeleteParticipant = async (target: FirebaseParticipant) => {
+    setDeletingUid(target.uid);
+    try {
+      await deleteFirebaseParticipant(target.uid);
+      setParticipants(prev => prev.filter(p => p.uid !== target.uid));
+      setActionSuccess(`Successfully removed ${target.name} (${target.email}). 1 slot freed.`);
+      setConfirmDeleteTarget(null);
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err: any) {
+      setError(`Failed to delete participant: ${err.message || 'Unknown error'}`);
+    } finally {
+      setDeletingUid(null);
+    }
+  };
 
   if (!authed) return <LoginGate onSuccess={() => setAuthed(true)} />;
 
@@ -260,6 +279,17 @@ export const FirebaseAdminPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* ── Action Success Banner ── */}
+        {actionSuccess && (
+          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm flex items-start gap-2.5">
+            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-emerald-400" />
+            <div>
+              <div className="font-bold text-white">Action Completed</div>
+              <div className="text-xs mt-0.5">{actionSuccess}</div>
+            </div>
+          </div>
+        )}
 
         {/* ── Error Banner ── */}
         {error && (
@@ -338,6 +368,7 @@ export const FirebaseAdminPage: React.FC = () => {
                     <th className="px-4 py-3 whitespace-nowrap"><Coins className="w-3 h-3 inline mr-1" />Balance</th>
                     <th className="px-4 py-3 whitespace-nowrap">Links</th>
                     <th className="px-4 py-3 whitespace-nowrap"><Clock className="w-3 h-3 inline mr-1" />Registered</th>
+                    <th className="px-4 py-3 whitespace-nowrap text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60 font-sans">
@@ -399,6 +430,18 @@ export const FirebaseAdminPage: React.FC = () => {
                           day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                         }) : '—'}
                       </td>
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteTarget(p)}
+                          className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          title={`Remove ${p.name} from Firebase`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -438,6 +481,61 @@ export const FirebaseAdminPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Delete Confirmation Modal ── */}
+      {confirmDeleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]">
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 max-w-md w-full border border-rose-500/30 shadow-2xl shadow-rose-950/50">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-black text-white text-center">
+              Remove Participant?
+            </h3>
+
+            <p className="text-xs text-gray-300 text-center mt-2 leading-relaxed">
+              Are you sure you want to permanently delete{' '}
+              <strong className="text-white">{confirmDeleteTarget.name}</strong>{' '}
+              (<span className="text-indigo-300 font-mono">@{confirmDeleteTarget.username}</span>,{' '}
+              <span className="text-gray-400">{confirmDeleteTarget.email}</span>) from the Firebase cloud database?
+            </p>
+
+            <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] text-center">
+              ⚡ This will free up 1 slot in the event registry (capacity: 40).
+            </div>
+
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                type="button"
+                disabled={deletingUid !== null}
+                onClick={() => setConfirmDeleteTarget(null)}
+                className="w-1/2 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingUid !== null}
+                onClick={() => handleDeleteParticipant(confirmDeleteTarget)}
+                className="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                {deletingUid ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Removing…</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

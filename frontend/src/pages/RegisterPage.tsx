@@ -2,7 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { registerParticipantWithFirebase, getParticipantCount, MAX_PARTICIPANTS } from '../services/firebase';
-import { UserPlus, Sparkles, CheckCircle2, AlertCircle, Coins, Cloud, Users, Lock } from 'lucide-react';
+import { 
+  UserPlus, 
+  Sparkles, 
+  CheckCircle2, 
+  AlertCircle, 
+  Coins, 
+  Cloud, 
+  Users, 
+  Lock,
+  MessageCircle,
+  ExternalLink,
+  Copy,
+  Check,
+  ArrowRight
+} from 'lucide-react';
+
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/HJ4FzfHLlOU8bH7Ie31eR9';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -24,9 +40,10 @@ export const RegisterPage: React.FC = () => {
   });
 
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [participantCount, setParticipantCount] = useState<number | null>(null);
+  const [registeredData, setRegisteredData] = useState<{ name: string; username: string; label: string; email: string } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Fetch current participant count on mount
   useEffect(() => {
@@ -48,10 +65,15 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(WHATSAPP_GROUP_URL);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccessMsg(null);
 
     if (formData.password !== formData.confirm_password) {
       setError("Passwords do not match.");
@@ -64,38 +86,137 @@ export const RegisterPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    let firebaseSaved = false;
 
     try {
       // 1. Save to Firebase Firestore (24/7 cloud availability)
-      await registerParticipantWithFirebase(formData);
-      firebaseSaved = true;
+      const savedDoc = await registerParticipantWithFirebase(formData);
 
-      // 2. Attempt sync with Django backend if active
-      try {
-        await register(formData);
-        navigate('/dashboard');
-        return;
-      } catch (backendErr) {
-        // Backend is currently offline (expected before event day)
-        console.log("Backend offline, registration recorded safely in Firebase Cloud Firestore.");
-      }
+      // 2. Best effort sync with Django backend if active
+      register(formData).catch(() => {});
 
-      setSuccessMsg("Registration Successful! Your details and 1,000 starting points have been securely recorded in the Firebase Cloud database.");
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+      // 3. Show persistent confirmation screen with WhatsApp group link
+      setRegisteredData({
+        name: formData.full_name,
+        username: formData.username,
+        label: savedDoc?.anonymous_label || 'P01',
+        email: formData.email,
+      });
 
     } catch (err: any) {
-      if (firebaseSaved) {
-        setSuccessMsg("Registration Successful! Stored in Firebase.");
-      } else {
-        setError(err.message || 'Registration failed. Please verify your details.');
-      }
+      setError(err.message || 'Registration failed. Please verify your details.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // ── Persistent Post-Registration Screen with WhatsApp Group ───────────────
+  if (registeredData) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-gray-100 flex items-center justify-center px-4 py-12">
+        <div className="max-w-xl w-full">
+          <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-emerald-500/30 text-center relative overflow-hidden shadow-2xl shadow-emerald-950/50">
+            {/* Top decorative glow */}
+            <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-40 bg-emerald-500/20 blur-3xl rounded-full pointer-events-none" />
+
+            {/* Success Icon */}
+            <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/10">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              Registration Confirmed
+            </div>
+
+            <h1 className="text-3xl font-black text-white">Welcome to BID2CODE 2026!</h1>
+            <p className="text-gray-300 text-sm mt-2">
+              Your registration has been securely recorded. You are assigned contestant ID{' '}
+              <span className="font-mono font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                {registeredData.label}
+              </span>
+              {' '}with <span className="text-amber-400 font-bold inline-flex items-center gap-1"><Coins className="w-3.5 h-3.5 inline" /> 1,000 virtual points</span>.
+            </p>
+
+            {/* ── Official WhatsApp Group Card ── */}
+            <div className="mt-8 p-6 rounded-2xl bg-gradient-to-b from-emerald-950/60 to-emerald-950/20 border-2 border-emerald-500/40 text-left relative overflow-hidden shadow-xl">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#25D366]/20 border border-[#25D366]/40 flex items-center justify-center text-[#25D366] shrink-0">
+                  <MessageCircle className="w-7 h-7 fill-current" />
+                </div>
+                <div>
+                  <div className="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-1">
+                    Mandatory Next Step
+                  </div>
+                  <h3 className="text-lg font-black text-white leading-tight">
+                    Join the Official WhatsApp Group
+                  </h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                    All live algorithm auction updates, problem arena links, and contest instructions will be broadcast exclusively in this group. You must join to participate on <strong>29 September 2026 (6:15 PM – 8:00 PM)</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Join WhatsApp Button */}
+              <div className="mt-5 space-y-3">
+                <a
+                  href={WHATSAPP_GROUP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-4 px-6 rounded-xl font-bold text-white bg-[#25D366] hover:bg-[#20ba59] shadow-xl shadow-emerald-950/80 flex items-center justify-center gap-2.5 text-base transition-all hover:scale-[1.01]"
+                >
+                  <MessageCircle className="w-5 h-5 fill-current" />
+                  <span>Join Official WhatsApp Group</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+
+                {/* Copy Link Helper */}
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gray-900/90 border border-gray-700/80 text-gray-300 hover:text-white text-xs font-mono flex items-center justify-center gap-2 transition-all hover:bg-gray-800"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400 font-semibold">Group Link Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="truncate">Copy Link: {WHATSAPP_GROUP_URL}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Note that this screen persists until exit */}
+            <p className="text-xs text-gray-500 mt-4">
+              📌 This screen will remain open until you exit. Please join the WhatsApp group now before proceeding.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="mt-6 pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center gap-3">
+              <Link
+                to="/login"
+                className="w-full sm:w-1/2 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all"
+              >
+                <span>Sign In to Arena</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+
+              <Link
+                to="/"
+                className="w-full sm:w-1/2 py-3 rounded-xl font-semibold text-gray-300 bg-gray-900/80 hover:bg-gray-800 border border-gray-700/70 hover:text-white text-center transition-all"
+              >
+                Exit to Homepage
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-gray-100 flex items-center justify-center px-4 py-12">
@@ -156,15 +277,6 @@ export const RegisterPage: React.FC = () => {
             </div>
           )}
 
-          {successMsg && (
-            <div className="mb-6 p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm flex items-start gap-2.5 glow-emerald">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold text-white">Registration Recorded!</div>
-                <div className="text-xs text-emerald-300 mt-1">{successMsg}</div>
-              </div>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
