@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { registerParticipantWithFirebase, getParticipantCount, MAX_PARTICIPANTS } from '../services/firebase';
+import { 
+  registerParticipantWithFirebase, 
+  getParticipantCount, 
+  getRegistrationStatus,
+  MAX_PARTICIPANTS 
+} from '../services/firebase';
 import { 
   UserPlus, 
   Sparkles, 
@@ -42,17 +47,23 @@ export const RegisterPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [participantCount, setParticipantCount] = useState<number | null>(null);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(true);
   const [registeredData, setRegisteredData] = useState<{ name: string; username: string; label: string; email: string } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Fetch current participant count on mount
+  // Fetch current participant count and registration status on mount
   useEffect(() => {
     getParticipantCount()
       .then(count => setParticipantCount(count))
       .catch(() => setParticipantCount(null));
+
+    getRegistrationStatus()
+      .then(open => setIsRegistrationOpen(open))
+      .catch(() => setIsRegistrationOpen(true));
   }, []);
 
   const isFull = participantCount !== null && participantCount >= MAX_PARTICIPANTS;
+  const isClosed = !isRegistrationOpen || isFull;
   const slotsLeft = participantCount !== null ? Math.max(0, MAX_PARTICIPANTS - participantCount) : null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -235,13 +246,15 @@ export const RegisterPage: React.FC = () => {
           {/* Live slot counter */}
           <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold"
             style={{
-              backgroundColor: isFull ? 'rgba(239,68,68,0.1)' : slotsLeft !== null && slotsLeft <= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
-              borderColor: isFull ? 'rgba(239,68,68,0.3)' : slotsLeft !== null && slotsLeft <= 5 ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)',
-              color: isFull ? '#f87171' : slotsLeft !== null && slotsLeft <= 5 ? '#fbbf24' : '#34d399',
+              backgroundColor: isClosed ? 'rgba(239,68,68,0.1)' : slotsLeft !== null && slotsLeft <= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+              borderColor: isClosed ? 'rgba(239,68,68,0.3)' : slotsLeft !== null && slotsLeft <= 5 ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)',
+              color: isClosed ? '#f87171' : slotsLeft !== null && slotsLeft <= 5 ? '#fbbf24' : '#34d399',
             }}
           >
             <Users className="w-4 h-4" />
-            {participantCount === null
+            {!isRegistrationOpen
+              ? '🔒 Registration Paused by Organizer'
+              : participantCount === null
               ? 'Checking availability…'
               : isFull
               ? '🔒 Registration Closed — Event Full (40/40)'
@@ -256,8 +269,19 @@ export const RegisterPage: React.FC = () => {
 
         {/* Card */}
         <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-gray-800">
-          {/* Registration Closed Banner */}
-          {isFull && (
+          {/* Registration Paused by Organizer Banner */}
+          {!isRegistrationOpen && (
+            <div className="mb-6 p-5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-center">
+              <Lock className="w-8 h-8 text-amber-400 mx-auto mb-2" />
+              <div className="text-amber-300 font-black text-lg">Registration is Paused</div>
+              <div className="text-amber-400/80 text-sm mt-1">
+                The event organizers have temporarily closed new registrations. Please check back soon or contact organizers.
+              </div>
+            </div>
+          )}
+
+          {/* Registration Full Banner */}
+          {isRegistrationOpen && isFull && (
             <div className="mb-6 p-5 rounded-xl bg-rose-500/10 border border-rose-500/40 text-center">
               <Lock className="w-8 h-8 text-rose-400 mx-auto mb-2" />
               <div className="text-rose-300 font-black text-lg">Registration is Closed</div>
@@ -486,15 +510,20 @@ export const RegisterPage: React.FC = () => {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={isSubmitting || isFull}
+                disabled={isSubmitting || isClosed}
                 className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg disabled:opacity-50 transition-all flex items-center justify-center space-x-2 ${
-                  isFull
+                  isClosed
                     ? 'bg-gray-700 cursor-not-allowed shadow-none'
                     : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
                 }`}
               >
                 {isSubmitting ? (
                   <span>Registering to Cloud...</span>
+                ) : !isRegistrationOpen ? (
+                  <>
+                    <Lock className="w-5 h-5 text-gray-400" />
+                    <span>Registration Paused by Organizer</span>
+                  </>
                 ) : isFull ? (
                   <>
                     <Lock className="w-5 h-5 text-gray-400" />

@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllFirebaseParticipants, deleteFirebaseParticipant } from '../services/firebase';
+import { 
+  getAllFirebaseParticipants, 
+  deleteFirebaseParticipant, 
+  getRegistrationStatus, 
+  setRegistrationStatus, 
+  adminAddParticipant 
+} from '../services/firebase';
 import {
   ShieldAlert,
   Users,
@@ -18,6 +24,9 @@ import {
   AlertCircle,
   ExternalLink,
   Trash2,
+  UserPlus,
+  Power,
+  X,
 } from 'lucide-react';
 
 // ── Simple password gate ──────────────────────────────────────────────────────
@@ -176,12 +185,36 @@ export const FirebaseAdminPage: React.FC = () => {
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<FirebaseParticipant | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  // Registration toggle state
+  const [isRegOpen, setIsRegOpen] = useState<boolean>(true);
+  const [isTogglingReg, setIsTogglingReg] = useState<boolean>(false);
+
+  // Manual Add Participant Modal state
+  const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [isAddingParticipant, setIsAddingParticipant] = useState<boolean>(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    email: '',
+    username: '',
+    password: 'bid2code2026',
+    phone: '',
+    college: 'Bannari Amman Institute of Technology',
+    department: 'CSE',
+    year_of_study: 'Year 2',
+    balance: 1000,
+  });
+
   const fetchParticipants = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getAllFirebaseParticipants();
+      const [data, regStatus] = await Promise.all([
+        getAllFirebaseParticipants(),
+        getRegistrationStatus()
+      ]);
       setParticipants(data as FirebaseParticipant[]);
+      setIsRegOpen(regStatus);
       setLastRefresh(new Date());
     } catch (err: any) {
       setError('Failed to fetch from Firebase. Check Firestore rules and connectivity.');
@@ -194,6 +227,50 @@ export const FirebaseAdminPage: React.FC = () => {
   useEffect(() => {
     if (authed) fetchParticipants();
   }, [authed, fetchParticipants]);
+
+  const handleToggleRegistration = async () => {
+    setIsTogglingReg(true);
+    try {
+      const nextState = !isRegOpen;
+      await setRegistrationStatus(nextState);
+      setIsRegOpen(nextState);
+      setActionSuccess(`Public registration is now ${nextState ? 'OPEN (accepting new coders)' : 'PAUSED (locked)'}.`);
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err: any) {
+      setError(`Failed to update registration status: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsTogglingReg(false);
+    }
+  };
+
+  const handleManualAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError(null);
+    setIsAddingParticipant(true);
+
+    try {
+      const newDoc = await adminAddParticipant(addForm);
+      setParticipants(prev => [...prev, newDoc as any]);
+      setActionSuccess(`Successfully added participant "${newDoc.name}" (${newDoc.email}) with Contestant ID ${newDoc.anonymous_label}.`);
+      setShowAddModal(false);
+      setAddForm({
+        full_name: '',
+        email: '',
+        username: '',
+        password: 'bid2code2026',
+        phone: '',
+        college: 'Bannari Amman Institute of Technology',
+        department: 'CSE',
+        year_of_study: 'Year 2',
+        balance: 1000,
+      });
+      setTimeout(() => setActionSuccess(null), 4500);
+    } catch (err: any) {
+      setAddError(err.message || 'Failed to add participant.');
+    } finally {
+      setIsAddingParticipant(false);
+    }
+  };
 
   const handleDeleteParticipant = async (target: FirebaseParticipant) => {
     setDeletingUid(target.uid);
@@ -251,11 +328,36 @@ export const FirebaseAdminPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+            {/* Registration On/Off Toggle Button */}
+            <button
+              onClick={handleToggleRegistration}
+              disabled={isTogglingReg}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                isRegOpen
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-950/40'
+                  : 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/40 text-rose-300 shadow-lg shadow-rose-950/40'
+              }`}
+              title="Click to toggle public registration on or off"
+            >
+              <Power className={`w-3.5 h-3.5 ${isTogglingReg ? 'animate-spin' : ''}`} />
+              <span className={`w-2 h-2 rounded-full ${isRegOpen ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+              <span>Registration: {isRegOpen ? 'OPEN' : 'PAUSED'}</span>
+            </button>
+
+            {/* Manual Add Participant Button */}
+            <button
+              onClick={() => { setShowAddModal(true); setAddError(null); }}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>+ Add Participant</span>
+            </button>
+
             <button
               onClick={fetchParticipants}
               disabled={isLoading}
-              className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -264,18 +366,17 @@ export const FirebaseAdminPage: React.FC = () => {
             <button
               onClick={() => exportToCSV(filtered)}
               disabled={filtered.length === 0}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-40"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-40"
             >
               <Download className="w-3.5 h-3.5" />
-              Download CSV
+              CSV
             </button>
 
             <button
               onClick={handleLogout}
-              className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400 hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400 hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
-              Sign Out
             </button>
           </div>
         </div>
@@ -533,6 +634,203 @@ export const FirebaseAdminPage: React.FC = () => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Manual Add Participant Modal ── */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]">
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-indigo-500/30 shadow-2xl shadow-indigo-950/50 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-800 mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Add Participant Manually</h3>
+                  <p className="text-xs text-gray-400">Registers participant directly into Firebase Cloud</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {addError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{addError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleManualAddSubmit} className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.full_name}
+                    onChange={e => setAddForm(prev => ({ ...prev, full_name: e.target.value }))}
+                    placeholder="e.g. John Doe"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Username *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.username}
+                    onChange={e => setAddForm(prev => ({ ...prev, username: e.target.value }))}
+                    placeholder="e.g. johndoe"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={addForm.email}
+                    onChange={e => setAddForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="e.g. user@gmail.com"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Password *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.password}
+                    onChange={e => setAddForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Default: bid2code2026"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={addForm.phone}
+                    onChange={e => setAddForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+91 9876543210"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    value={addForm.department}
+                    onChange={e => setAddForm(prev => ({ ...prev, department: e.target.value }))}
+                    placeholder="e.g. CSE / IT / AI-DS"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    College / Institution
+                  </label>
+                  <input
+                    type="text"
+                    value={addForm.college}
+                    onChange={e => setAddForm(prev => ({ ...prev, college: e.target.value }))}
+                    placeholder="College name"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                    Year of Study
+                  </label>
+                  <select
+                    value={addForm.year_of_study}
+                    onChange={e => setAddForm(prev => ({ ...prev, year_of_study: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="Year 1">Year 1</option>
+                    <option value="Year 2">Year 2</option>
+                    <option value="Year 3">Year 3</option>
+                    <option value="Year 4">Year 4</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-300 uppercase tracking-wider mb-1">
+                  Starting Balance (Points)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10000"
+                  value={addForm.balance}
+                  onChange={e => setAddForm(prev => ({ ...prev, balance: parseInt(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-gray-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={isAddingParticipant}
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAddingParticipant}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {isAddingParticipant ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving to Cloud…</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Add Participant</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

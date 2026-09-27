@@ -55,28 +55,114 @@ export async function getParticipantCount(): Promise<number> {
 }
 
 /**
+ * Gets registration status (open/closed) from Firestore. Defaults to true (open).
+ */
+export async function getRegistrationStatus(): Promise<boolean> {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'registration'));
+    if (snap.exists()) {
+      const data = snap.data();
+      return data.is_open !== false;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch registration status from Firestore:', err);
+  }
+  return true;
+}
+
+/**
+ * Toggles registration open/closed in Firestore settings collection.
+ */
+export async function setRegistrationStatus(isOpen: boolean): Promise<void> {
+  await setDoc(doc(db, 'settings', 'registration'), {
+    is_open: isOpen,
+    updated_at: new Date().toISOString(),
+  }, { merge: true });
+}
+
+export interface ManualParticipantData {
+  full_name: string;
+  email: string;
+  username: string;
+  password?: string;
+  phone?: string;
+  college?: string;
+  department?: string;
+  year_of_study?: string;
+  balance?: number;
+}
+
+/**
+ * Manually adds a participant from the Admin Portal into Firestore.
+ */
+export async function adminAddParticipant(data: ManualParticipantData) {
+  const docId = data.email.replace(/[.@]/g, '_');
+
+  // Check duplicate email
+  const existing = await getDoc(doc(db, 'participants', docId));
+  if (existing.exists()) {
+    throw new Error(`Participant with email "${data.email}" already exists.`);
+  }
+
+  const snap = await getDocs(collection(db, 'participants'));
+  const nextNumber = snap.size + 1;
+  const label = `P${nextNumber.toString().padStart(2, '0')}`;
+
+  const participantDoc = {
+    uid: docId,
+    name: data.full_name,
+    email: data.email,
+    phone: data.phone || '',
+    college: data.college || 'Manual Registration',
+    department: data.department || '',
+    year_of_study: data.year_of_study || 'Year 2',
+    username: data.username.trim(),
+    password: data.password || 'bid2code2026',
+    github_profile: '',
+    linkedin_profile: '',
+    anonymous_label: label,
+    balance: data.balance ?? 1000,
+    algorithm_assigned: null,
+    algorithm_assigned_name: null,
+    is_active_participant: true,
+    created_at: new Date().toISOString(),
+    server_timestamp: serverTimestamp(),
+  };
+
+  await setDoc(doc(db, 'participants', docId), participantDoc);
+  return participantDoc;
+}
+
+/**
  * Saves participant registration directly to Firestore `participants` collection.
  *
  * Rules enforced:
- *  1. Hard cap at MAX_PARTICIPANTS (40). Throws if full.
- *  2. Duplicate email check — throws if already registered.
- *  3. Labels assigned sequentially (P01 … P40).
+ *  1. Admin registration toggle check — blocks if closed.
+ *  2. Hard cap at MAX_PARTICIPANTS (40). Throws if full.
+ *  3. Duplicate email check — throws if already registered.
+ *  4. Labels assigned sequentially (P01 … P40).
  */
 export async function registerParticipantWithFirebase(data: FirebaseRegistrationData) {
+  // 1. Check if registration was closed by admin
+  const isOpen = await getRegistrationStatus();
+  if (!isOpen) {
+    throw new Error('Registration is currently closed by the event organizers.');
+  }
+
   const docId = data.email.replace(/[.@]/g, '_');
 
-  // 1. Fetch current snapshot once (used for both cap + label)
+  // 2. Fetch current snapshot once (used for both cap + label)
   const snap = await getDocs(collection(db, 'participants'));
   const currentCount = snap.size;
 
-  // 2. Hard capacity check — block if event is full
+  // 3. Hard capacity check — block if event is full
   if (currentCount >= MAX_PARTICIPANTS) {
     throw new Error(
       `Registration is closed. BID2CODE 2026 has reached its maximum capacity of ${MAX_PARTICIPANTS} participants.`
     );
   }
 
-  // 3. Duplicate email check — block if already registered
+  // 4. Duplicate email check — block if already registered
   const existing = await getDoc(doc(db, 'participants', docId));
   if (existing.exists()) {
     throw new Error(
