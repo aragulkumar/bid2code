@@ -120,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Admin uses backend JWT directly (not Firebase — admin only exists in Django DB)
     if (isAdminUser) {
+      localStorage.removeItem('bit2code_firebase_user');
       try {
         const res = await api.login(credentials);
         if (res.access) {
@@ -171,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    localStorage.removeItem('bit2code_admin_user');
     // 1. Try Firebase Cloud first (handles all participant registrations)
     try {
       const fbUser = await loginParticipantWithFirebase(credentials);

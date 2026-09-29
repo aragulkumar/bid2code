@@ -64,7 +64,21 @@ class FirebaseSyncLoginView(views.APIView):
         if not username and not email:
             return Response({"error": "Username or email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Find existing user by username or email
+        # 1. Check if this is the Admin / Staff user
+        if username.lower() == 'admin' or email.lower() == 'admin@bit2code.ieee.org':
+            admin_user = User.objects.filter(username__iexact='admin').first()
+            if not admin_user:
+                admin_user = User.objects.create_superuser('admin', 'admin@bit2code.ieee.org', password or 'admin123')
+            refresh = RefreshToken.for_user(admin_user)
+            return Response({
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "is_staff": True,
+                "username": "admin",
+                "participant": None
+            }, status=status.HTTP_200_OK)
+
+        # 2. Find existing user by username or email
         user = None
         if username:
             user = User.objects.filter(username__iexact=username).first()
@@ -89,23 +103,67 @@ class FirebaseSyncLoginView(views.APIView):
                 user.set_password(password)
                 user.save()
 
-        # Ensure Participant profile exists
-        participant = getattr(user, 'participant_profile', None)
+        # If this existing user is staff, do NOT create a participant
+        if user.is_staff or user.is_superuser:
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "is_staff": True,
+                "username": user.username,
+                "participant": None
+            }, status=status.HTTP_200_OK)
+
+        # 3. Ensure Participant profile exists
+        try:
+            participant = user.participant_profile
+        except (Participant.DoesNotExist, Exception):
+            participant = None
+
         if not participant:
-            if not anonymous_label:
-                count = Participant.objects.count() + 1
-                anonymous_label = f"P{count:02d}"
+            # Check if requested anonymous_label is already taken by ANOTHER user
+            label = anonymous_label
+            if not label or Participant.objects.filter(anonymous_label=label).exists():
+                # Find the next truly available label
+                idx = 1
+                while Participant.objects.filter(anonymous_label=f"P{idx:02d}").exists():
+                    idx += 1
+                label = f"P{idx:02d}"
+
             participant = Participant.objects.create(
                 user=user,
-                anonymous_label=anonymous_label,
+                anonymous_label=label,
                 name=name or user.username,
                 email=email or user.email,
-                phone=phone,
-                college=college,
-                department=department,
-                year_of_study=year_of_study,
+                phone=phone or '',
+                college=college or '',
+                department=department or '',
+                year_of_study=year_of_study or '',
                 balance=getattr(settings, 'STARTING_POINTS', 1000)
             )
+        else:
+            # Update existing participant info if new details are provided
+            updated_fields = []
+            if name and participant.name != name:
+                participant.name = name
+                updated_fields.append('name')
+            if email and participant.email != email:
+                participant.email = email
+                updated_fields.append('email')
+            if phone and participant.phone != phone:
+                participant.phone = phone
+                updated_fields.append('phone')
+            if college and participant.college != college:
+                participant.college = college
+                updated_fields.append('college')
+            if department and participant.department != department:
+                participant.department = department
+                updated_fields.append('department')
+            if year_of_study and participant.year_of_study != year_of_study:
+                participant.year_of_study = year_of_study
+                updated_fields.append('year_of_study')
+            if updated_fields:
+                participant.save(update_fields=updated_fields)
 
         refresh = RefreshToken.for_user(user)
         return Response({
