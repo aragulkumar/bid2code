@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { AdminOverview, Algorithm, Participant, Submission } from '../types';
+import { getAllFirebaseParticipants } from '../services/firebase';
+import { AdminOverview, Algorithm, Submission } from '../types';
 import { 
   ShieldAlert, 
   Play, 
@@ -8,40 +9,60 @@ import {
   Shuffle, 
   Users, 
   FileCode2, 
-  CheckCircle2, 
-  Clock, 
-  Coins, 
-  Sparkles,
-  AlertCircle,
-  RefreshCw
+  CheckCircle2,
+  RefreshCw,
+  Mail,
+  GraduationCap,
 } from 'lucide-react';
 import { Timer } from '../components/Timer';
 import { VerdictBadge } from '../components/VerdictBadge';
 
+interface FirebaseParticipant {
+  uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  college: string;
+  department: string;
+  year_of_study: string;
+  username: string;
+  anonymous_label: string;
+  balance: number;
+  algorithm_assigned: string | null;
+  algorithm_assigned_name: string | null;
+  is_active_participant: boolean;
+  is_coding?: boolean;
+  is_coding_finished?: boolean;
+  created_at: string;
+  [key: string]: unknown;
+}
+
 export const AdminPortalPage: React.FC = () => {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [algorithms, setAlgorithms] = useState<Algorithm[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [fbParticipants, setFbParticipants] = useState<FirebaseParticipant[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedAlgoId, setSelectedAlgoId] = useState<number | undefined>(undefined);
   const [durationSecs, setDurationSecs] = useState<number>(45);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [isLoading, setIsLoading] = useState(true);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Fetch backend data (auction, overview, submissions) + real Firebase participants
   const fetchAdminData = async () => {
     try {
-      const [ov, algos, parts, subs] = await Promise.all([
-        api.getAdminOverview(),
-        api.getAlgorithms(),
-        api.getAdminParticipants(),
-        api.getAdminSubmissions()
+      const [ov, algos, subs, fbParts] = await Promise.all([
+        api.getAdminOverview().catch(() => null),
+        api.getAlgorithms().catch(() => []),
+        api.getAdminSubmissions().catch(() => []),
+        getAllFirebaseParticipants(),
       ]);
-      setOverview(ov);
+      if (ov) setOverview(ov);
       setAlgorithms(algos);
-      setParticipants(parts);
       setSubmissions(subs);
+      setFbParticipants(fbParts as FirebaseParticipant[]);
       if (!selectedAlgoId && algos.length > 0) {
         setSelectedAlgoId(algos[0].id);
       }
@@ -240,12 +261,31 @@ export const AdminPortalPage: React.FC = () => {
           )}
         </div>
 
-        {/* Participants Table */}
+        {/* Participants Directory — Real Firebase Registrations */}
         <div className="glass-panel rounded-3xl p-6 border border-gray-800">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-400" />
-            <span>Participants Directory ({participants.length})</span>
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-400" />
+              <span>Registered Participants ({fbParticipants.length})</span>
+              <span className="text-xs font-normal text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5 ml-1">
+                Live from Firebase
+              </span>
+            </h3>
+            {/* Search */}
+            <input
+              type="text"
+              placeholder="Search name, email, username..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-xs placeholder-gray-500 focus:outline-none focus:border-indigo-500 w-full sm:w-56 transition-colors"
+            />
+          </div>
+
+          {fbParticipants.length === 0 && !isLoading && (
+            <div className="text-center py-10 text-gray-500 text-sm">
+              No participants registered yet.
+            </div>
+          )}
 
           <div className="overflow-x-auto max-h-96">
             <table className="w-full text-left text-xs">
@@ -253,45 +293,70 @@ export const AdminPortalPage: React.FC = () => {
                 <tr>
                   <th className="px-4 py-3">ID</th>
                   <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Username</th>
+                  <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">College</th>
+                  <th className="px-4 py-3">Year</th>
                   <th className="px-4 py-3">Balance</th>
-                  <th className="px-4 py-3">Assigned Algorithm</th>
-                  <th className="px-4 py-3">Timer Status</th>
+                  <th className="px-4 py-3">Algorithm</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/60 font-sans">
-                {participants.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-800/30">
-                    <td className="px-4 py-3 font-mono font-bold text-indigo-400">{p.anonymous_label}</td>
-                    <td className="px-4 py-3 font-bold text-white">{p.name}</td>
-                    <td className="px-4 py-3 text-gray-400">{p.college}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-amber-400">{p.balance} pts</td>
-                    <td className="px-4 py-3">
-                      {p.algorithm_assigned_name ? (
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
-                          {p.algorithm_assigned_name}
+                {fbParticipants
+                  .filter(p => {
+                    const q = searchQuery.toLowerCase();
+                    return !q ||
+                      (p.name || '').toLowerCase().includes(q) ||
+                      (p.email || '').toLowerCase().includes(q) ||
+                      (p.username || '').toLowerCase().includes(q) ||
+                      (p.anonymous_label || '').toLowerCase().includes(q) ||
+                      (p.college || '').toLowerCase().includes(q);
+                  })
+                  .map((p, idx) => (
+                    <tr key={p.uid || idx} className="hover:bg-gray-800/30">
+                      <td className="px-4 py-3 font-mono font-bold text-indigo-400">
+                        {p.anonymous_label || `P${String(idx + 1).padStart(2, '0')}`}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-white">{p.name}</td>
+                      <td className="px-4 py-3 font-mono text-gray-300">{p.username}</td>
+                      <td className="px-4 py-3 text-gray-400 flex items-center gap-1">
+                        <Mail className="w-3 h-3 shrink-0" />
+                        {p.email}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <GraduationCap className="w-3 h-3 shrink-0" />
+                          {p.college || '—'}
                         </span>
-                      ) : (
-                        <span className="text-gray-500">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {p.is_coding ? (
-                        <span className="text-pink-400 font-mono font-bold">
-                          Coding ({Math.floor(p.remaining_coding_seconds / 60)}m left)
-                        </span>
-                      ) : p.is_coding_finished ? (
-                        <span className="text-gray-500">Finished</span>
-                      ) : (
-                        <span className="text-gray-400">Not Started</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">{p.year_of_study || '—'}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-amber-400">{p.balance ?? 1000} pts</td>
+                      <td className="px-4 py-3">
+                        {p.algorithm_assigned_name ? (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
+                            {p.algorithm_assigned_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {p.is_coding ? (
+                          <span className="text-pink-400 font-mono font-bold">Coding</span>
+                        ) : p.is_coding_finished ? (
+                          <span className="text-gray-500">Finished</span>
+                        ) : (
+                          <span className="text-emerald-400">Registered</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         </div>
+
 
         {/* Live Submissions Stream */}
         <div className="glass-panel rounded-3xl p-6 border border-gray-800">
