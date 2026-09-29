@@ -617,13 +617,6 @@ class LeaderboardView(views.APIView):
 
             total_score = round(coding_score + bid_bonus, 2)
 
-            # Compute total execution time for best submissions
-            total_exec_time = 0.0
-            if medium_sub:
-                total_exec_time += medium_sub.execution_time
-            if easy_sub:
-                total_exec_time += easy_sub.execution_time
-
             # Coding Completion Time Calculation:
             # Time from start of coding until the participant gets Accepted on their final required problem.
             med_accepted = Submission.objects.filter(
@@ -687,10 +680,12 @@ class LeaderboardView(views.APIView):
                 'coding_score': coding_score,
                 'bid_bonus': bid_bonus,
                 'total_score': total_score,
-                'total_execution_time': round(total_exec_time, 3),
-                'submission_count': total_submissions,
-                'coding_completion_time_seconds': coding_completion_time_seconds,
+                'total_time_taken': coding_time_display,
+                'coding_time': coding_time_display,
                 'coding_time_display': coding_time_display,
+                'coding_completion_time_seconds': coding_completion_time_seconds,
+                'total_execution_time': coding_completion_time_seconds or 0,
+                'submission_count': total_submissions,
                 'last_accepted_submission_at': completion_timestamp,
             })
 

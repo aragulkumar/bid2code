@@ -126,7 +126,9 @@ export interface LeaderboardEntry {
   bid_bonus: number;
   total_score: number;
   submission_count: number;
-  total_execution_time: number;
+  total_execution_time?: number;
+  total_time_taken?: string | null;
+  coding_time?: string | null;
   coding_completion_time_seconds: number | null;
   coding_time_display: string | null;
   last_accepted_submission_at: string | null;

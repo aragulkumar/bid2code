@@ -188,8 +188,11 @@ class LeaderboardEntrySerializer(serializers.Serializer):
     coding_score = serializers.IntegerField(default=0)
     bid_bonus = serializers.FloatField(default=0.0)
     total_score = serializers.FloatField()
-    total_execution_time = serializers.FloatField(default=0.0)
+    total_execution_time = serializers.IntegerField(default=0, required=False)
     submission_count = serializers.IntegerField(default=0)
+    total_time_taken = serializers.CharField(allow_null=True, required=False)
+    coding_time = serializers.CharField(allow_null=True, required=False)
     coding_completion_time_seconds = serializers.IntegerField(allow_null=True, required=False)
     coding_time_display = serializers.CharField(allow_null=True, required=False)
     last_accepted_submission_at = serializers.DateTimeField(allow_null=True)
+

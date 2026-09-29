@@ -114,8 +114,11 @@ export const LeaderboardPage: React.FC = () => {
           </div>
           <div>
             <div className="text-[10px] text-gray-500 uppercase mb-1">Coding Time</div>
-            {entry.coding_time_display ? (
-              <span className="text-gray-200 text-xs font-mono font-bold">{entry.coding_time_display}</span>
+            {(entry.coding_time_display || entry.total_time_taken) ? (
+              <div>
+                <span className="text-gray-100 text-sm font-mono font-bold">{entry.coding_time_display || entry.total_time_taken}</span>
+                <span className="block text-[9px] text-gray-500 font-mono">total time taken</span>
+              </div>
             ) : (
               <span className="text-gray-600 text-xs font-mono">-</span>
             )}
@@ -142,7 +145,7 @@ export const LeaderboardPage: React.FC = () => {
             </div>
             <h1 className="text-3xl font-black text-white">Live Leaderboard</h1>
             <p className="text-xs text-gray-400 mt-1">
-              Max 210 pts (Code: 200 + Bid Bonus: up to 10) &bull; Ranked: Score &rarr; Coding Time &rarr; Fewer Attempts &rarr; Earliest Finish
+              Max 210 pts (Code: 200 + Bid Bonus: up to 10) &bull; Ranked: Score &rarr; Coding Time (Total Time Taken for 2 Problems) &rarr; Fewer Attempts &rarr; Earliest Finish
             </p>
           </div>
           <div className="relative max-w-xs w-full">
@@ -193,7 +196,11 @@ export const LeaderboardPage: React.FC = () => {
                   <th className="px-5 py-4 text-right">Total</th>
                   <th className="px-5 py-4 text-center">Attempts</th>
                   <th className="px-5 py-4 text-right">
-                    <Clock className="w-3 h-3 inline mr-1" />Coding Time
+                    <div className="flex items-center justify-end gap-1">
+                      <Clock className="w-3.5 h-3.5 inline text-indigo-400" />
+                      <span>Coding Time</span>
+                    </div>
+                    <span className="block text-[9px] text-gray-400 font-normal normal-case tracking-normal">Total time taken</span>
                   </th>
                 </tr>
               </thead>
@@ -295,7 +302,7 @@ export const LeaderboardPage: React.FC = () => {
                         </td>
 
                         <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                          <CodingTimeDisplay timeDisplay={row.coding_time_display} />
+                          <CodingTimeDisplay timeDisplay={row.coding_time || row.coding_time_display || row.total_time_taken} />
                         </td>
                       </tr>
                     );
