@@ -60,12 +60,12 @@ export const AuctionPage: React.FC = () => {
   useEffect(() => {
     fetchAuctionData();
     fetchAlgorithms();
+    refreshUser();
 
-    // Poll every 1.5 seconds for live bid updates
+    // Poll every 2 seconds for live bid updates
     const interval = setInterval(() => {
       fetchAuctionData();
-      refreshUser();
-    }, 1500);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);

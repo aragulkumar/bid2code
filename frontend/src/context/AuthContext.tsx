@@ -20,13 +20,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshUser = async () => {
-    // 1. Try active backend token first
-    const token = localStorage.getItem('bit2code_access_token');
+    let token = localStorage.getItem('bit2code_access_token');
+    const storedFbUser = localStorage.getItem('bit2code_firebase_user');
+
+    // 1. If we have Firebase user cached but no token, immediately sync to acquire JWT
+    if (!token && storedFbUser) {
+      try {
+        const parsedFb = JSON.parse(storedFbUser);
+        const syncRes = await api.firebaseSyncLogin({
+          username: parsedFb.username,
+          email: parsedFb.email,
+          name: parsedFb.name,
+          phone: parsedFb.phone,
+          college: parsedFb.college,
+          department: parsedFb.department,
+          year_of_study: parsedFb.year_of_study,
+          anonymous_label: parsedFb.anonymous_label,
+        });
+        if (syncRes.access) {
+          localStorage.setItem('bit2code_access_token', syncRes.access);
+          if (syncRes.refresh) localStorage.setItem('bit2code_refresh_token', syncRes.refresh);
+          token = syncRes.access;
+          if (syncRes.participant) {
+            setUser(syncRes.participant);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Silent sync error during refreshUser:', syncErr);
+      }
+    }
+
+    // 2. Try active backend token
     if (token) {
       try {
         const data = await api.getMe();
         if (data && data.id) {
-          // Regular participant — has full profile
+          // Regular participant — has full live profile
           setUser(data as Participant);
           setIsLoading(false);
           return;
@@ -54,15 +85,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
           return;
         }
-      } catch {
-        localStorage.removeItem('bit2code_access_token');
-        localStorage.removeItem('bit2code_refresh_token');
-        localStorage.removeItem('bit2code_admin_user');
+      } catch (err: any) {
+        // Only clear token if backend explicitly rejected credentials
+        if (err.message && (err.message.includes('401') || err.message.includes('credentials') || err.message.includes('token_not_valid'))) {
+          localStorage.removeItem('bit2code_access_token');
+          localStorage.removeItem('bit2code_refresh_token');
+          localStorage.removeItem('bit2code_admin_user');
+        }
       }
     }
 
-    // 2. Check if participant has a Firebase session (24/7 cloud availability)
-    const storedFbUser = localStorage.getItem('bit2code_firebase_user');
+    // 3. Fallback: Check if participant has a Firebase session (offline / initial load)
     if (storedFbUser) {
       try {
         const parsed = JSON.parse(storedFbUser);
