@@ -221,21 +221,23 @@ export const AuctionPage: React.FC = () => {
                 </p>
               </div>
 
-              {/* Slot Availability */}
-              <div className="p-4 rounded-2xl bg-gray-900/80 border border-gray-800 mb-8 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Layers className="w-5 h-5 text-indigo-400" />
-                  <div>
-                    <div className="text-xs text-gray-400">Slot Availability</div>
-                    <div className="text-sm font-bold text-white">
-                      {auction.algorithm_details?.assigned_slots} / {auction.algorithm_details?.total_slots} Slots Assigned
+              {/* Slot Availability - Staff Only */}
+              {user?.is_staff && (
+                <div className="p-4 rounded-2xl bg-gray-900/80 border border-gray-800 mb-8 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Layers className="w-5 h-5 text-indigo-400" />
+                    <div>
+                      <div className="text-xs text-gray-400">Slot Availability</div>
+                      <div className="text-sm font-bold text-white">
+                        {auction.algorithm_details?.assigned_slots} / {auction.algorithm_details?.total_slots} Slots Assigned
+                      </div>
                     </div>
                   </div>
+                  <div className="text-xs font-mono px-3 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                    {auction.algorithm_details?.remaining_slots} Remaining
+                  </div>
                 </div>
-                <div className="text-xs font-mono px-3 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                  {auction.algorithm_details?.remaining_slots} Remaining
-                </div>
-              </div>
+              )}
 
               {/* Bid Placement Form */}
               <div className="pt-6 border-t border-gray-800">
@@ -366,29 +368,31 @@ export const AuctionPage: React.FC = () => {
           </div>
         )}
 
-        {/* Algorithm Catalog / Available Slots */}
-        <div className="pt-6">
-          <h3 className="text-lg font-black text-white mb-4">Event Algorithm Bank (40 Total Slots)</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {algorithms.map((algo) => (
-              <div key={algo.id} className="glass-panel rounded-2xl p-5 border border-gray-800">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h4 className="font-bold text-white text-sm">{algo.name}</h4>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                    {algo.remaining_slots} left
-                  </span>
+        {/* Algorithm Catalog / Available Slots — Admin Only */}
+        {user?.is_staff && (
+          <div className="pt-6">
+            <h3 className="text-lg font-black text-white mb-4">Event Algorithm Bank (40 Total Slots)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {algorithms.map((algo) => (
+                <div key={algo.id} className="glass-panel rounded-2xl p-5 border border-gray-800">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h4 className="font-bold text-white text-sm">{algo.name}</h4>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                      {algo.remaining_slots} left
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 line-clamp-2">{algo.description}</p>
+                  <div className="mt-3 w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-500 h-full rounded-full transition-all"
+                      style={{ width: `${(algo.assigned_slots / algo.total_slots) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <p className="text-xs text-gray-400 line-clamp-2">{algo.description}</p>
-                <div className="mt-3 w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-indigo-500 h-full rounded-full transition-all"
-                    style={{ width: `${(algo.assigned_slots / algo.total_slots) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
