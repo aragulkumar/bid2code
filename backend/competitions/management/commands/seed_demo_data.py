@@ -452,29 +452,4 @@ class Command(BaseCommand):
             )
             self.stdout.write(f"Easy Problem: {prob.title} [General Pool]")
 
-        # 5. Create 40 Demo Participants
-        self.stdout.write("Ensuring 40 demo participants...")
-        for i in range(1, 41):
-            anon_label = f"P{i:02d}"
-            username = f"participant_{i:02d}"
-            email = f"p{i:02d}@bit2code.ieee.org"
-            
-            user, _ = User.objects.get_or_create(
-                username=username,
-                defaults={'email': email}
-            )
-            user.set_password("bit2code2026")
-            user.save()
-
-            Participant.objects.update_or_create(
-                user=user,
-                defaults={
-                    "anonymous_label": anon_label,
-                    "name": f"Competitor {i:02d}",
-                    "email": email,
-                    "balance": 1000,
-                    "is_active_participant": True
-                }
-            )
-
         self.stdout.write(self.style.SUCCESS(f"\nSUCCESS! Seeded 40 Medium Problems + 20 Easy Problems across all 8 Categories."))

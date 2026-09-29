@@ -622,13 +622,14 @@ class LeaderboardView(views.APIView):
 
         # Sort leaderboard:
         # 1. Total Score (descending)
-        # 2. Total Execution Time (ascending)
-        # 3. Last accepted submission time (earlier is better)
+        # 2. Total Execution Time (ascending for competitors with score > 0)
+        # 3. Last accepted submission time (earlier timestamp wins tie)
         entries.sort(
             key=lambda x: (
                 -x['total_score'],
-                x['total_execution_time'],
-                x['last_accepted_submission_at'].timestamp() if x['last_accepted_submission_at'] else 9999999999
+                x['total_execution_time'] if x['total_score'] > 0 else 9999999999,
+                x['last_accepted_submission_at'].timestamp() if x['last_accepted_submission_at'] else 9999999999,
+                x['participant_label']
             )
         )
 
