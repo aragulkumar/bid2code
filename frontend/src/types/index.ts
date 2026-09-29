@@ -119,8 +119,11 @@ export interface LeaderboardEntry {
   participant_name: string;
   college: string;
   algorithm_name: string | null;
+  assignment_type?: 'BID' | 'RANDOM' | 'PENDING';
   medium_score: number;
   easy_score: number;
+  coding_score: number;
+  bid_bonus: number;
   total_score: number;
   total_execution_time: number;
   last_accepted_submission_at: string | null;

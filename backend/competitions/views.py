@@ -577,23 +577,45 @@ class LeaderboardView(views.APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        participants = Participant.objects.filter(is_active_participant=True).select_related('algorithm_assigned')
+        participants = Participant.objects.filter(is_active_participant=True).select_related(
+            'algorithm_assigned', 'algorithm_assignment'
+        )
         
         entries = []
         for p in participants:
-            # Best score for Medium problem
+            # Best score for Medium problem (0-100)
             medium_sub = Submission.objects.filter(
                 participant=p, problem__difficulty='MEDIUM'
             ).order_by('-score', 'execution_time').first()
             medium_score = medium_sub.score if medium_sub else 0
 
-            # Best score for Easy problem
+            # Best score for Easy problem (0-100)
             easy_sub = Submission.objects.filter(
                 participant=p, problem__difficulty='EASY'
             ).order_by('-score', 'execution_time').first()
             easy_score = easy_sub.score if easy_sub else 0
 
-            total_score = medium_score + easy_score
+            coding_score = medium_score + easy_score
+
+            # Check if participant won via auction or was assigned randomly
+            assignment = getattr(p, 'algorithm_assignment', None)
+            if assignment:
+                assignment_type = assignment.assignment_type
+            elif p.algorithm_assigned:
+                assignment_type = 'BID'
+            else:
+                assignment_type = 'PENDING'
+
+            # Event Rule: Remaining bidding points go as bonus ONLY if secured via auction bid!
+            # Scale: 1000 bid points → max 10 bonus points. Formula: (balance / 1000) * 10
+            # e.g. 500 remaining → 5 bonus, 1000 remaining → 10 bonus, 249 remaining → 2.49 bonus
+            # Max total score = 200 (coding) + 10 (bonus) = 210
+            if assignment_type == 'BID' and p.algorithm_assigned:
+                bid_bonus = round((p.balance / 1000) * 10, 2)
+            else:
+                bid_bonus = 0
+
+            total_score = round(coding_score + bid_bonus, 2)
 
             # Compute total execution time for best submissions
             total_exec_time = 0.0
@@ -613,21 +635,27 @@ class LeaderboardView(views.APIView):
                 'participant_name': p.name,
                 'college': p.college or 'IEEE CS Member',
                 'algorithm_name': p.algorithm_assigned.name if p.algorithm_assigned else 'Pending',
+                'assignment_type': assignment_type,
                 'medium_score': medium_score,
                 'easy_score': easy_score,
+                'coding_score': coding_score,
+                'bid_bonus': bid_bonus,
                 'total_score': total_score,
                 'total_execution_time': round(total_exec_time, 3),
                 'last_accepted_submission_at': last_accepted_at,
             })
 
         # Sort leaderboard:
-        # 1. Total Score (descending)
-        # 2. Total Execution Time (ascending for competitors with score > 0)
-        # 3. Last accepted submission time (earlier timestamp wins tie)
+        # 1. Total Score (descending) = coding_score + bid_bonus
+        # 2. Coding Score (descending) — pure code performance
+        # 3. Total Execution Time (ascending) — only counts if coding_score > 0
+        #    (prevents 0-submission participants floating up due to 0s exec time)
+        # 4. Last accepted submission time (earlier wins tie)
         entries.sort(
             key=lambda x: (
                 -x['total_score'],
-                x['total_execution_time'] if x['total_score'] > 0 else 9999999999,
+                -x['coding_score'],
+                x['total_execution_time'] if x['coding_score'] > 0 else 9999999999,
                 x['last_accepted_submission_at'].timestamp() if x['last_accepted_submission_at'] else 9999999999,
                 x['participant_label']
             )
@@ -758,7 +786,8 @@ class AdminRandomAssignRemainingView(views.APIView):
             chosen_algo = random.choice(with_slots if with_slots else available_algorithms)
             
             p.algorithm_assigned = chosen_algo
-            p.save(update_fields=['algorithm_assigned'])
+            p.balance = 0  # Random assignment competitors receive NO remaining bidding bonus
+            p.save(update_fields=['algorithm_assigned', 'balance'])
 
             chosen_algo.assigned_slots += 1
             chosen_algo.save(update_fields=['assigned_slots'])

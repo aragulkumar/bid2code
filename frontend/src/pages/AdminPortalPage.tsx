@@ -211,12 +211,12 @@ export const AdminPortalPage: React.FC = () => {
                 Select Algorithm to Auction
               </label>
               <select
-                value={selectedAlgoId}
+                value={selectedAlgoId ?? ''}
                 onChange={(e) => setSelectedAlgoId(parseInt(e.target.value))}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm focus:outline-none focus:border-indigo-500"
               >
                 {algorithms.map(algo => (
-                  <option key={algo.id} value={algo.id}>
+                  <option key={algo.id} value={String(algo.id)}>
                     {algo.name} ({algo.remaining_slots} slots remaining)
                   </option>
                 ))}
