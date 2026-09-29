@@ -630,6 +630,9 @@ class LeaderboardView(views.APIView):
             ).order_by('-submitted_at').first()
             last_accepted_at = last_accepted.submitted_at if last_accepted else None
 
+            # Total submissions made (all statuses) — fewer = cleaner solving
+            total_submissions = Submission.objects.filter(participant=p).count()
+
             entries.append({
                 'participant_label': p.anonymous_label,
                 'participant_name': p.name,
@@ -642,21 +645,22 @@ class LeaderboardView(views.APIView):
                 'bid_bonus': bid_bonus,
                 'total_score': total_score,
                 'total_execution_time': round(total_exec_time, 3),
+                'submission_count': total_submissions,
                 'last_accepted_submission_at': last_accepted_at,
             })
 
-        # Sort leaderboard:
-        # 1. Total Score (descending) = coding_score + bid_bonus
-        # 2. Coding Score (descending) — pure code performance
-        # 3. Total Execution Time (ascending) — only counts if coding_score > 0
-        #    (prevents 0-submission participants floating up due to 0s exec time)
-        # 4. Last accepted submission time (earlier wins tie)
+        # Ranking Rules:
+        # Rank 1 — Total Score (desc): Medium + Easy + Bid Bonus
+        # Rank 2 — Coding Completion Time (asc): shorter exec time wins
+        #           (only applies if coding_score > 0 — prevents 0-code getting 0s advantage)
+        # Rank 3 — Number of Submissions (asc): fewer submissions = cleaner solving
+        # Rank 4 — Server-recorded completion timestamp (asc): earlier finish wins
         entries.sort(
             key=lambda x: (
                 -x['total_score'],
-                -x['coding_score'],
-                x['total_execution_time'] if x['coding_score'] > 0 else 9999999999,
-                x['last_accepted_submission_at'].timestamp() if x['last_accepted_submission_at'] else 9999999999,
+                x['total_execution_time'] if x['coding_score'] > 0 else 9999999999.0,
+                x['submission_count'] if x['coding_score'] > 0 else 9999999,
+                x['last_accepted_submission_at'].timestamp() if x['last_accepted_submission_at'] else 9999999999.0,
                 x['participant_label']
             )
         )

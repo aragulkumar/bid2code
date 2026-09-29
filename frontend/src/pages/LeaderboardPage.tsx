@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { LeaderboardEntry } from '../types';
@@ -134,7 +134,7 @@ export const LeaderboardPage: React.FC = () => {
             </div>
             <h1 className="text-3xl font-black text-white">Live Leaderboard</h1>
             <p className="text-xs text-gray-400 mt-1">
-              Max 210 pts (Code: 200 + Bid Bonus: up to 10) � Ranked by Score then Exec Time
+              Max 210 pts (Code: 200 + Bid Bonus: up to 10) ï¿½ Ranked: Score &rarr; Exec Time &rarr; Fewer Attempts &rarr; Earliest Finish
             </p>
           </div>
           <div className="relative max-w-xs w-full">
@@ -181,8 +181,9 @@ export const LeaderboardPage: React.FC = () => {
                   <th className="px-5 py-4 text-center">Medium</th>
                   <th className="px-5 py-4 text-center">Easy</th>
                   <th className="px-5 py-4 text-center">Coding</th>
-                  <th className="px-5 py-4 text-center">Bid Bonus</th>
+                  <th className="px-5 py-4 text-center">Bonus</th>
                   <th className="px-5 py-4 text-right">Total</th>
+                  <th className="px-5 py-4 text-center">Attempts</th>
                   <th className="px-5 py-4 text-right">
                     <Clock className="w-3 h-3 inline mr-1" />Exec Time
                   </th>
@@ -191,11 +192,11 @@ export const LeaderboardPage: React.FC = () => {
               <tbody className="divide-y divide-gray-800/80 font-sans">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">Loading leaderboard standings...</td>
+                    <td colSpan={10} className="px-6 py-12 text-center text-gray-500">Loading leaderboard standings...</td>
                   </tr>
                 ) : filteredEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">No participants matching query.</td>
+                    <td colSpan={10} className="px-6 py-12 text-center text-gray-500">No participants matching query.</td>
                   </tr>
                 ) : (
                   filteredEntries.map((row) => {
@@ -273,6 +274,18 @@ export const LeaderboardPage: React.FC = () => {
                           <span className="text-xs text-gray-500 font-mono ml-1">/ 210</span>
                         </td>
 
+                        <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                          {row.submission_count > 0 ? (
+                            <span className={`font-mono text-xs font-bold px-2 py-1 rounded border ${
+                              row.submission_count <= 2 ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+                              : row.submission_count <= 5 ? 'text-gray-300 bg-gray-700/40 border-gray-700'
+                              : 'text-rose-300 bg-rose-500/10 border-rose-500/20'
+                            }`}>{row.submission_count}</span>
+                          ) : (
+                            <span className="text-gray-700 text-xs">-</span>
+                          )}
+                        </td>
+
                         <td className="px-5 py-3.5 text-right whitespace-nowrap">
                           <ExecTimeDisplay time={row.total_execution_time} codingScore={row.coding_score} />
                         </td>
@@ -288,3 +301,4 @@ export const LeaderboardPage: React.FC = () => {
     </div>
   );
 };
+
