@@ -26,13 +26,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const data = await api.getMe();
         if (data && data.id) {
+          // Regular participant — has full profile
           setUser(data as Participant);
+          setIsLoading(false);
+          return;
+        } else if (data && data.is_staff) {
+          // Admin / staff account — no participant profile, reconstruct from stored data
+          const stored = localStorage.getItem('bit2code_admin_user');
+          const adminBase = stored ? JSON.parse(stored) : {};
+          const adminUser = {
+            ...adminBase,
+            id: adminBase.id || 'admin',
+            username: data.username || 'admin',
+            anonymous_label: 'ADMIN',
+            name: data.username || 'Admin',
+            email: adminBase.email || 'admin@bit2code.ieee.org',
+            is_staff: true,
+            is_superuser: true,
+            balance: 0,
+            algorithm_assigned: null,
+            algorithm_assigned_name: null,
+            has_algorithm: false,
+            is_coding: false,
+            is_coding_finished: false,
+          };
+          setUser(adminUser as any);
           setIsLoading(false);
           return;
         }
       } catch {
         localStorage.removeItem('bit2code_access_token');
         localStorage.removeItem('bit2code_refresh_token');
+        localStorage.removeItem('bit2code_admin_user');
       }
     }
 
@@ -58,6 +83,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (credentials: { username: string; password: string }) => {
+    const isAdminUser = credentials.username.trim().toLowerCase() === 'admin';
+
+    // Admin uses backend JWT directly (not Firebase — admin only exists in Django DB)
+    if (isAdminUser) {
+      try {
+        const res = await api.login(credentials);
+        if (res.access) {
+          localStorage.setItem('bit2code_access_token', res.access);
+          localStorage.setItem('bit2code_refresh_token', res.refresh);
+          // Build admin user object from the login response (avoids a second getMe() call)
+          const adminUser = {
+            id: res.user_id || 'admin',
+            username: 'admin',
+            anonymous_label: 'ADMIN',
+            name: res.name || 'Admin',
+            email: res.email || 'admin@bit2code.ieee.org',
+            phone: '',
+            college: '',
+            department: '',
+            year_of_study: '',
+            github_profile: '',
+            linkedin_profile: '',
+            balance: 0,
+            algorithm_assigned: null,
+            algorithm_assigned_name: null,
+            coding_started_at: null,
+            coding_deadline: null,
+            remaining_coding_seconds: 0,
+            has_algorithm: false,
+            is_coding: false,
+            is_coding_finished: false,
+            is_staff: true,
+            is_superuser: true,
+            created_at: new Date().toISOString(),
+          };
+          // Try to get real user data from backend, but don't block on it
+          try {
+            const me = await api.getMe();
+            if (me && me.id) {
+              setUser({ ...adminUser, ...me, is_staff: true });
+              setIsLoading(false);
+              localStorage.setItem('bit2code_admin_user', JSON.stringify({ ...adminUser, ...me, is_staff: true }));
+              return;
+            }
+          } catch { /* backend might be local-only, use constructed admin */ }
+          localStorage.setItem('bit2code_admin_user', JSON.stringify(adminUser));
+          setUser(adminUser as any);
+          setIsLoading(false);
+          return;
+        }
+      } catch (backendErr: any) {
+        throw new Error(backendErr.message || 'Admin login failed. Make sure the backend server (Docker) is running.');
+      }
+    }
+
     // 1. Try Firebase Cloud first (handles all participant registrations)
     try {
       const fbUser = await loginParticipantWithFirebase(credentials);
@@ -80,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw fbErr;
       }
 
-      // 2. Fallback to backend API (e.g. for staff/admin user)
+      // 2. Fallback to backend API (e.g. for other staff users)
       try {
         const res = await api.login(credentials);
         if (res.access) {
@@ -108,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('bit2code_access_token');
     localStorage.removeItem('bit2code_refresh_token');
     localStorage.removeItem('bit2code_firebase_user');
+    localStorage.removeItem('bit2code_admin_user');
     setUser(null);
   };
 

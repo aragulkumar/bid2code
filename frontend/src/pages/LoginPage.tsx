@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogIn, AlertCircle, Code2, Shield } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -19,7 +19,12 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login({ username, password });
-      navigate('/dashboard');
+      // Redirect admin to the control portal, participants to dashboard
+      if (username.trim().toLowerCase() === 'admin') {
+        navigate('/admin-portal');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid username or password.');
     } finally {

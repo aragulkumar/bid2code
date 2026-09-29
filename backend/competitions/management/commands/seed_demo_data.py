@@ -18,10 +18,12 @@ class Command(BaseCommand):
                 'is_superuser': True
             }
         )
-        if created:
-            admin_user.set_password('admin123')
-            admin_user.save()
-            self.stdout.write(self.style.SUCCESS("Admin account ready: admin / admin123"))
+        # Always ensure password is correct (not just on first create)
+        admin_user.set_password('admin123')
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.save()
+        self.stdout.write(self.style.SUCCESS("Admin account ready: admin / admin123"))
 
         # 2. Create 8 Algorithm Categories (5 slots each = 40 total participant slots)
         algorithms_data = [
