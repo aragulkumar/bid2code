@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { getAllFirebaseParticipants } from '../services/firebase';
 import { AdminOverview, Algorithm, Submission } from '../types';
@@ -15,6 +15,9 @@ import {
   AlertTriangle,
   Mail,
   GraduationCap,
+  Zap,
+  ZapOff,
+  Clock,
 } from 'lucide-react';
 import { Timer } from '../components/Timer';
 import { VerdictBadge } from '../components/VerdictBadge';
@@ -54,6 +57,15 @@ export const AdminPortalPage: React.FC = () => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
 
+  // Auto-Pilot state
+  const [isAutoPilot, setIsAutoPilot] = useState(false);
+  const [autoPilotCountdown, setAutoPilotCountdown] = useState(0);
+  const autoPilotRef = useRef(false);
+  const countdownRef = useRef(0);
+  const overviewRef = useRef<AdminOverview | null>(null);
+  const algorithmsRef = useRef<Algorithm[]>([]);
+  const durationRef = useRef(45);
+
   // Fetch backend data (auction, overview, submissions) + real Firebase participants
   const fetchAdminData = async () => {
     try {
@@ -63,8 +75,12 @@ export const AdminPortalPage: React.FC = () => {
         api.getAdminSubmissions().catch(() => []),
         getAllFirebaseParticipants(),
       ]);
-      if (ov) setOverview(ov);
+      if (ov) {
+        setOverview(ov);
+        overviewRef.current = ov;
+      }
       setAlgorithms(algos);
+      algorithmsRef.current = algos;
       setSubmissions(subs);
       setFbParticipants(fbParts as FirebaseParticipant[]);
       if (!selectedAlgoId && algos.length > 0) {
@@ -81,6 +97,74 @@ export const AdminPortalPage: React.FC = () => {
     fetchAdminData();
     const interval = setInterval(fetchAdminData, 2000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Keep durationRef in sync
+  useEffect(() => { durationRef.current = durationSecs; }, [durationSecs]);
+
+  // Auto-Pilot tick — runs every 1 second
+  useEffect(() => {
+    autoPilotRef.current = isAutoPilot;
+    if (!isAutoPilot) {
+      countdownRef.current = 0;
+      setAutoPilotCountdown(0);
+      return;
+    }
+    // Start with a 3-second grace period
+    countdownRef.current = 3;
+    setAutoPilotCountdown(3);
+
+    const tick = setInterval(async () => {
+      if (!autoPilotRef.current) return;
+
+      const ov = overviewRef.current;
+      const algos = algorithmsRef.current;
+      const auctionStatus = ov?.current_auction?.status;
+
+      if (auctionStatus === 'ACTIVE') {
+        // Auction running — reset post-auction countdown to 5s gap
+        countdownRef.current = 5;
+        setAutoPilotCountdown(5);
+        return;
+      }
+
+      // Auction not active — count down before starting next
+      if (countdownRef.current > 0) {
+        countdownRef.current--;
+        setAutoPilotCountdown(countdownRef.current);
+        return;
+      }
+
+      // Check if any algorithms have slots remaining
+      const hasRemaining = algos.some(a => a.remaining_slots > 0);
+      if (!hasRemaining) {
+        autoPilotRef.current = false;
+        setIsAutoPilot(false);
+        setActionMsg('✅ Auto-Pilot complete! All algorithms auctioned. Run "Random Assign Remaining" now.');
+        return;
+      }
+
+      // Start next auction — backend picks next available algorithm by order
+      try {
+        const res = await api.startAuction(undefined, durationRef.current);
+        setActionMsg(`🤖 AUTO: ${res.message}`);
+        // Reset countdown: duration + 5s gap
+        countdownRef.current = durationRef.current + 5;
+        setAutoPilotCountdown(durationRef.current + 5);
+        await fetchAdminData();
+      } catch (e: any) {
+        setActionMsg(`Auto-pilot error: ${e.message}`);
+        autoPilotRef.current = false;
+        setIsAutoPilot(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [isAutoPilot]);
+
+  const toggleAutoPilot = useCallback(() => {
+    setIsAutoPilot(prev => !prev);
+    setActionMsg(null);
   }, []);
 
   const handleStartAuction = async () => {
@@ -236,13 +320,36 @@ export const AdminPortalPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {/* Auto-Pilot Toggle */}
+              <button
+                onClick={toggleAutoPilot}
+                className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 shadow-lg ${
+                  isAutoPilot
+                    ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/30 animate-pulse'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                }`}
+              >
+                {isAutoPilot ? <ZapOff className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                <span>{isAutoPilot ? 'Stop Auto-Pilot' : '⚡ Auto-Pilot ALL'}</span>
+              </button>
+
+              {/* Countdown badge when auto-pilot is on */}
+              {isAutoPilot && autoPilotCountdown > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-mono">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Next in {autoPilotCountdown}s</span>
+                </div>
+              )}
+
+              <div className="w-px h-6 bg-gray-700" />
+
               <button
                 onClick={handleStartAuction}
-                disabled={isProcessing}
+                disabled={isProcessing || isAutoPilot}
                 className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Play className="w-4 h-4" />
-                <span>Start 45s Cycle</span>
+                <span>Manual Start</span>
               </button>
 
               <button
