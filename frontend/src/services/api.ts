@@ -1,9 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://slider-outmatch-silent.ngrok-free.dev/api';
 
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('bit2code_access_token');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
