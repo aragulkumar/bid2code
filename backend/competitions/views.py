@@ -624,11 +624,54 @@ class LeaderboardView(views.APIView):
             if easy_sub:
                 total_exec_time += easy_sub.execution_time
 
-            # Last accepted submission timestamp
-            last_accepted = Submission.objects.filter(
-                participant=p, status='ACCEPTED'
-            ).order_by('-submitted_at').first()
-            last_accepted_at = last_accepted.submitted_at if last_accepted else None
+            # Coding Completion Time Calculation:
+            # Time from start of coding until the participant gets Accepted on their final required problem.
+            med_accepted = Submission.objects.filter(
+                participant=p, problem__difficulty='MEDIUM', status='ACCEPTED'
+            ).order_by('submitted_at').first()
+            if not med_accepted and medium_score > 0:
+                med_accepted = Submission.objects.filter(
+                    participant=p, problem__difficulty='MEDIUM', score=medium_score
+                ).order_by('submitted_at').first()
+
+            easy_accepted = Submission.objects.filter(
+                participant=p, problem__difficulty='EASY', status='ACCEPTED'
+            ).order_by('submitted_at').first()
+            if not easy_accepted and easy_score > 0:
+                easy_accepted = Submission.objects.filter(
+                    participant=p, problem__difficulty='EASY', score=easy_score
+                ).order_by('submitted_at').first()
+
+            # When was the final required problem accepted?
+            if med_accepted and easy_accepted:
+                completion_timestamp = max(med_accepted.submitted_at, easy_accepted.submitted_at)
+            elif med_accepted:
+                completion_timestamp = med_accepted.submitted_at
+            elif easy_accepted:
+                completion_timestamp = easy_accepted.submitted_at
+            else:
+                last_accepted = Submission.objects.filter(
+                    participant=p, status='ACCEPTED'
+                ).order_by('-submitted_at').first()
+                completion_timestamp = last_accepted.submitted_at if last_accepted else None
+
+            start_time = p.coding_started_at
+            if not start_time:
+                first_sub = Submission.objects.filter(participant=p).order_by('submitted_at').first()
+                start_time = first_sub.submitted_at if first_sub else p.created_at
+
+            coding_completion_time_seconds = None
+            coding_time_display = None
+            if completion_timestamp and start_time and coding_score > 0:
+                diff_sec = max(0, int((completion_timestamp - start_time).total_seconds()))
+                coding_completion_time_seconds = diff_sec
+                hrs = diff_sec // 3600
+                mins = (diff_sec % 3600) // 60
+                secs = diff_sec % 60
+                if hrs > 0:
+                    coding_time_display = f"{hrs}h {mins:02d}m {secs:02d}s"
+                else:
+                    coding_time_display = f"{mins}m {secs:02d}s"
 
             # Total submissions made (all statuses) — fewer = cleaner solving
             total_submissions = Submission.objects.filter(participant=p).count()
@@ -646,19 +689,21 @@ class LeaderboardView(views.APIView):
                 'total_score': total_score,
                 'total_execution_time': round(total_exec_time, 3),
                 'submission_count': total_submissions,
-                'last_accepted_submission_at': last_accepted_at,
+                'coding_completion_time_seconds': coding_completion_time_seconds,
+                'coding_time_display': coding_time_display,
+                'last_accepted_submission_at': completion_timestamp,
             })
 
         # Ranking Rules:
         # Rank 1 — Total Score (desc): Medium + Easy + Bid Bonus
-        # Rank 2 — Coding Completion Time (asc): shorter exec time wins
-        #           (only applies if coding_score > 0 — prevents 0-code getting 0s advantage)
+        # Rank 2 — Coding Completion Time (asc): shorter elapsed time from start until completion
+        #           (only applies if coding_score > 0 and coding_completion_time_seconds is set)
         # Rank 3 — Number of Submissions (asc): fewer submissions = cleaner solving
         # Rank 4 — Server-recorded completion timestamp (asc): earlier finish wins
         entries.sort(
             key=lambda x: (
                 -x['total_score'],
-                x['total_execution_time'] if x['coding_score'] > 0 else 9999999999.0,
+                x['coding_completion_time_seconds'] if (x['coding_score'] > 0 and x['coding_completion_time_seconds'] is not None) else 9999999999.0,
                 x['submission_count'] if x['coding_score'] > 0 else 9999999,
                 x['last_accepted_submission_at'].timestamp() if x['last_accepted_submission_at'] else 9999999999.0,
                 x['participant_label']

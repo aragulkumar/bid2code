@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { LeaderboardEntry } from '../types';
@@ -35,11 +35,15 @@ const ScoreDisplay = ({
   );
 };
 
-const ExecTimeDisplay = ({ time, codingScore }: { time: number; codingScore: number }) => {
-  if (codingScore === 0) {
+const CodingTimeDisplay = ({ timeDisplay }: { timeDisplay: string | null | undefined }) => {
+  if (!timeDisplay) {
     return <span className="text-gray-600 text-xs font-mono">-</span>;
   }
-  return <span className="text-gray-300 text-xs font-mono">{time}s</span>;
+  return (
+    <span className="font-mono text-xs font-bold text-indigo-300 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20">
+      {timeDisplay}
+    </span>
+  );
 };
 
 export const LeaderboardPage: React.FC = () => {
@@ -109,8 +113,12 @@ export const LeaderboardPage: React.FC = () => {
             <ScoreDisplay total={entry.total_score} coding={entry.coding_score} bonus={entry.bid_bonus} size={isGold ? 'md' : 'sm'} />
           </div>
           <div>
-            <div className="text-[10px] text-gray-500 uppercase mb-1">Time</div>
-            <ExecTimeDisplay time={entry.total_execution_time} codingScore={entry.coding_score} />
+            <div className="text-[10px] text-gray-500 uppercase mb-1">Coding Time</div>
+            {entry.coding_time_display ? (
+              <span className="text-gray-200 text-xs font-mono font-bold">{entry.coding_time_display}</span>
+            ) : (
+              <span className="text-gray-600 text-xs font-mono">-</span>
+            )}
           </div>
           <div>
             <div className="text-[10px] text-gray-500 uppercase mb-1">Topic</div>
@@ -134,7 +142,7 @@ export const LeaderboardPage: React.FC = () => {
             </div>
             <h1 className="text-3xl font-black text-white">Live Leaderboard</h1>
             <p className="text-xs text-gray-400 mt-1">
-              Max 210 pts (Code: 200 + Bid Bonus: up to 10) ï¿½ Ranked: Score &rarr; Exec Time &rarr; Fewer Attempts &rarr; Earliest Finish
+              Max 210 pts (Code: 200 + Bid Bonus: up to 10) &bull; Ranked: Score &rarr; Coding Time &rarr; Fewer Attempts &rarr; Earliest Finish
             </p>
           </div>
           <div className="relative max-w-xs w-full">
@@ -185,7 +193,7 @@ export const LeaderboardPage: React.FC = () => {
                   <th className="px-5 py-4 text-right">Total</th>
                   <th className="px-5 py-4 text-center">Attempts</th>
                   <th className="px-5 py-4 text-right">
-                    <Clock className="w-3 h-3 inline mr-1" />Exec Time
+                    <Clock className="w-3 h-3 inline mr-1" />Coding Time
                   </th>
                 </tr>
               </thead>
@@ -287,7 +295,7 @@ export const LeaderboardPage: React.FC = () => {
                         </td>
 
                         <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                          <ExecTimeDisplay time={row.total_execution_time} codingScore={row.coding_score} />
+                          <CodingTimeDisplay timeDisplay={row.coding_time_display} />
                         </td>
                       </tr>
                     );
