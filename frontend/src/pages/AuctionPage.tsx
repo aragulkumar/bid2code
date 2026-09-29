@@ -241,7 +241,7 @@ export const AuctionPage: React.FC = () => {
 
               {/* Bid Placement Form */}
               <div className="pt-6 border-t border-gray-800">
-                <form onSubmit={handlePlaceBid} className="space-y-4">
+                <form onSubmit={handlePlaceBid} noValidate className="space-y-4">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <div className="relative flex-1">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
@@ -251,8 +251,8 @@ export const AuctionPage: React.FC = () => {
                         type="number"
                         min={(auction.current_highest_bid || 0) + 1}
                         max={user?.balance || 1000}
-                        step="10"
-                        value={bidAmount}
+                        step="1"
+                        value={bidAmount || ''}
                         onChange={(e) => setBidAmount(parseInt(e.target.value) || 0)}
                         disabled={user?.has_algorithm || isPlacingBid}
                         placeholder="Enter bid amount"
@@ -260,15 +260,20 @@ export const AuctionPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Quick increment buttons */}
+                    {/* Quick increment buttons — adds +50, +100, +200 on top of current bid */}
                     <div className="flex items-center gap-2">
-                      {[+50, +100, +200].map(inc => (
+                      {[50, 100, 200].map(inc => (
                         <button
                           key={inc}
                           type="button"
-                          onClick={() => setBidAmount(prev => Math.min(user?.balance || 1000, (auction.current_highest_bid || 0) + inc))}
+                          onClick={() => {
+                            setBidAmount(prev => {
+                              const base = Math.max(prev || 0, auction.current_highest_bid || 0);
+                              return Math.min(user?.balance || 1000, base + inc);
+                            });
+                          }}
                           disabled={user?.has_algorithm}
-                          className="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-mono text-gray-300 border border-gray-700 disabled:opacity-40"
+                          className="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 active:scale-95 text-xs font-mono font-bold text-gray-300 hover:text-white border border-gray-700 hover:border-purple-500/50 disabled:opacity-40 transition-all"
                         >
                           +{inc}
                         </button>
