@@ -6,7 +6,7 @@ from .views import (
     SubmitCodeView, RunSampleCodeView, SubmissionHistoryView,
     LeaderboardView, AdminOverviewView, AdminStartAuctionView,
     AdminCloseAuctionView, AdminRandomAssignRemainingView,
-    AdminParticipantsListView, AdminSubmissionsListView
+    AdminParticipantsListView, AdminSubmissionsListView, AdminResetEventView
 )
 
 urlpatterns = [
@@ -41,4 +41,5 @@ urlpatterns = [
     path('admin-controls/auction/random-assign/', AdminRandomAssignRemainingView.as_view(), name='admin-auction-random-assign'),
     path('admin-controls/participants/', AdminParticipantsListView.as_view(), name='admin-participants'),
     path('admin-controls/submissions/', AdminSubmissionsListView.as_view(), name='admin-submissions'),
+    path('admin-controls/event/reset/', AdminResetEventView.as_view(), name='admin-event-reset'),
 ]

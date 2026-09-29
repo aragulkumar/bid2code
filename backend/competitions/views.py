@@ -742,3 +742,40 @@ class AdminSubmissionsListView(views.APIView):
         submissions = Submission.objects.all().select_related('participant', 'problem').order_by('-submitted_at')[:100]
         serializer = SubmissionSerializer(submissions, many=True)
         return Response(serializer.data)
+
+
+class AdminResetEventView(views.APIView):
+    """
+    Completely resets all event state:
+    - Clears all submissions
+    - Clears all bids and auctions
+    - Clears participant algorithm & problem assignments
+    - Resets algorithm assigned_slots to 0
+    - Restores all participant balances back to 1000 points
+    - Clears all coding session deadlines and timers
+    - Keeps participant registration accounts intact
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    @transaction.atomic
+    def post(self, request):
+        Submission.objects.all().delete()
+        Bid.objects.all().delete()
+        Auction.objects.all().delete()
+        ParticipantProblem.objects.all().delete()
+        ParticipantAlgorithm.objects.all().delete()
+        Algorithm.objects.all().update(assigned_slots=0, is_active=True)
+
+        starting_points = getattr(settings, 'STARTING_POINTS', 1000)
+        Participant.objects.all().update(
+            balance=starting_points,
+            algorithm_assigned=None,
+            coding_started_at=None,
+            coding_deadline=None,
+            is_active_participant=True
+        )
+
+        return Response({
+            "message": "Event reset successfully! All auctions, bids, submissions, and timer states have been reset. All participant balances restored to 1000 pts.",
+            "starting_points": starting_points
+        }, status=status.HTTP_200_OK)

@@ -81,4 +81,5 @@ export const api = {
   randomAssignRemaining: () => request<any>('/admin-controls/auction/random-assign/', { method: 'POST' }),
   getAdminParticipants: () => request<any[]>('/admin-controls/participants/'),
   getAdminSubmissions: () => request<any[]>('/admin-controls/submissions/'),
+  resetEvent: () => request<any>('/admin-controls/event/reset/', { method: 'POST' }),
 };

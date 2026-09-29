@@ -11,6 +11,8 @@ import {
   FileCode2, 
   CheckCircle2,
   RefreshCw,
+  RotateCcw,
+  AlertTriangle,
   Mail,
   GraduationCap,
 } from 'lucide-react';
@@ -49,6 +51,8 @@ export const AdminPortalPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
 
   // Fetch backend data (auction, overview, submissions) + real Firebase participants
   const fetchAdminData = async () => {
@@ -116,6 +120,23 @@ export const AdminPortalPage: React.FC = () => {
       await fetchAdminData();
     } catch (err: any) {
       setActionMsg(err.message || 'Failed to assign remaining algorithms.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleResetEvent = async () => {
+    if (resetConfirmText.trim().toUpperCase() !== 'RESET') return;
+    setIsProcessing(true);
+    setActionMsg(null);
+    setShowResetConfirm(false);
+    setResetConfirmText('');
+    try {
+      const res = await api.resetEvent();
+      setActionMsg(res.message);
+      await fetchAdminData();
+    } catch (err: any) {
+      setActionMsg(err.message || 'Failed to reset event.');
     } finally {
       setIsProcessing(false);
     }
@@ -240,6 +261,16 @@ export const AdminPortalPage: React.FC = () => {
               >
                 <Shuffle className="w-4 h-4" />
                 <span>Random Assign Remaining</span>
+              </button>
+
+              {/* Reset Event — Danger Zone */}
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                disabled={isProcessing}
+                className="px-5 py-2.5 rounded-xl bg-transparent border-2 border-rose-700 hover:bg-rose-900/30 text-rose-400 hover:text-rose-300 font-bold text-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reset Event</span>
               </button>
             </div>
           </div>
@@ -399,6 +430,64 @@ export const AdminPortalPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Reset Confirmation Modal ── */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#0F1420] border-2 border-rose-600/60 rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl shadow-rose-900/40">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-rose-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-white">Reset Entire Event</h2>
+                <p className="text-xs text-rose-400 font-mono">This action is irreversible!</p>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-300 space-y-2 mb-6">
+              <p>The following will be permanently deleted:</p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>All auctions and bids</li>
+                <li>All algorithm assignments</li>
+                <li>All coding sessions and timers</li>
+                <li>All submissions and scores</li>
+              </ul>
+              <p className="mt-3 text-gray-400">Participant accounts and registrations will <strong className="text-white">NOT</strong> be deleted. Balances will be restored to <strong className="text-amber-400">1000 pts</strong>.</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-mono uppercase text-rose-400 mb-1.5">
+                Type <strong>RESET</strong> to confirm
+              </label>
+              <input
+                type="text"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="RESET"
+                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-rose-700/50 text-white font-mono font-bold text-lg focus:outline-none focus:border-rose-500 placeholder-gray-600 tracking-widest"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowResetConfirm(false); setResetConfirmText(''); }}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 font-bold text-sm transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetEvent}
+                disabled={resetConfirmText.trim().toUpperCase() !== 'RESET'}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset Event Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
