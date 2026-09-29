@@ -43,6 +43,78 @@ class RegisterView(views.APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class FirebaseSyncLoginView(views.APIView):
+    """
+    Seamlessly synchronizes a Firebase participant into the Django PostgreSQL database
+    and issues an active JWT access & refresh token.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username', '').strip()
+        email = request.data.get('email', '').strip()
+        password = request.data.get('password', '')
+        name = request.data.get('name', '') or request.data.get('full_name', '') or username
+        phone = request.data.get('phone', '')
+        college = request.data.get('college', '')
+        department = request.data.get('department', '')
+        year_of_study = request.data.get('year_of_study', '')
+        anonymous_label = request.data.get('anonymous_label', '')
+
+        if not username and not email:
+            return Response({"error": "Username or email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find existing user by username or email
+        user = None
+        if username:
+            user = User.objects.filter(username__iexact=username).first()
+        if not user and email:
+            user = User.objects.filter(email__iexact=email).first()
+
+        if not user:
+            final_username = username or email.split('@')[0]
+            base_username = final_username
+            counter = 1
+            while User.objects.filter(username__iexact=final_username).exists():
+                final_username = f"{base_username}_{counter}"
+                counter += 1
+
+            user = User.objects.create_user(
+                username=final_username,
+                email=email,
+                password=password if password else 'bit2code2026'
+            )
+        else:
+            if password:
+                user.set_password(password)
+                user.save()
+
+        # Ensure Participant profile exists
+        participant = getattr(user, 'participant_profile', None)
+        if not participant:
+            if not anonymous_label:
+                count = Participant.objects.count() + 1
+                anonymous_label = f"P{count:02d}"
+            participant = Participant.objects.create(
+                user=user,
+                anonymous_label=anonymous_label,
+                name=name or user.username,
+                email=email or user.email,
+                phone=phone,
+                college=college,
+                department=department,
+                year_of_study=year_of_study,
+                balance=getattr(settings, 'STARTING_POINTS', 1000)
+            )
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "participant": ParticipantSerializer(participant).data
+        }, status=status.HTTP_200_OK)
+
+
 class CurrentUserView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 

@@ -144,15 +144,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('bit2code_firebase_user', JSON.stringify(fbUser));
       setUser(fbUser as any);
 
-      // Best effort backend sync in background
-      api.login(credentials)
-        .then(res => {
-          if (res.access) {
-            localStorage.setItem('bit2code_access_token', res.access);
-            localStorage.setItem('bit2code_refresh_token', res.refresh);
+      // Immediately sync with Django backend via ngrok tunnel to get live JWT
+      try {
+        const syncRes = await api.firebaseSyncLogin({
+          username: fbUser.username,
+          email: fbUser.email,
+          password: credentials.password,
+          name: fbUser.name,
+          phone: fbUser.phone,
+          college: fbUser.college,
+          department: fbUser.department,
+          year_of_study: fbUser.year_of_study,
+          anonymous_label: fbUser.anonymous_label,
+        });
+        if (syncRes.access) {
+          localStorage.setItem('bit2code_access_token', syncRes.access);
+          localStorage.setItem('bit2code_refresh_token', syncRes.refresh);
+          if (syncRes.participant) {
+            setUser(syncRes.participant);
           }
-        })
-        .catch(() => {});
+        }
+      } catch (syncErr) {
+        console.warn('Backend sync deferred (will retry when backend is reachable):', syncErr);
+      }
       return;
     } catch (fbErr: any) {
       // If it's an explicit wrong password, fail immediately

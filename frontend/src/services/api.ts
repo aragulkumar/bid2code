@@ -39,6 +39,7 @@ export const api = {
   // Auth
   register: (data: any) => request<any>('/auth/register/', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: any) => request<any>('/auth/login/', { method: 'POST', body: JSON.stringify(data) }),
+  firebaseSyncLogin: (data: any) => request<any>('/auth/firebase-login/', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => request<any>('/auth/me/'),
 
   // Algorithms & Auction

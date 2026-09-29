@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
-    RegisterView, CurrentUserView, AlgorithmListView, ActiveAuctionView,
+    RegisterView, FirebaseSyncLoginView, CurrentUserView, AlgorithmListView, ActiveAuctionView,
     PlaceBidView, StartCodingSessionView, AssignedProblemsView,
     SubmitCodeView, RunSampleCodeView, SubmissionHistoryView,
     LeaderboardView, AdminOverviewView, AdminStartAuctionView,
@@ -12,6 +12,7 @@ from .views import (
 urlpatterns = [
     # Auth Endpoints
     path('auth/register/', RegisterView.as_view(), name='auth-register'),
+    path('auth/firebase-login/', FirebaseSyncLoginView.as_view(), name='auth-firebase-login'),
     path('auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/me/', CurrentUserView.as_view(), name='auth-me'),
